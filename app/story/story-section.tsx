@@ -27,43 +27,50 @@ export default function StorySection() {
   }, [])
 
   useEffect(() => {
+    let ticking = false
     const handleScroll = () => {
-      const scrollY = window.scrollY
-      setParallaxOffset(scrollY * 0.5)
-
-      // Intersection Observer for scroll-triggered animations
-      const observerOptions = {
-        threshold: 0.3,
-        rootMargin: '0px 0px -100px 0px',
-      }
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.target === journeyRef.current && entry.isIntersecting) {
-            setScrollVisibility((prev) => ({ ...prev, journey: true }))
-          }
-          if (entry.target === philosophyRef.current && entry.isIntersecting) {
-            setScrollVisibility((prev) => ({ ...prev, philosophy: true }))
-          }
-          if (entry.target === craftsmanshipRef.current && entry.isIntersecting) {
-            setScrollVisibility((prev) => ({ ...prev, craftsmanship: true }))
-          }
-          if (entry.target === hoodieRef.current && entry.isIntersecting) {
-            setScrollVisibility((prev) => ({ ...prev, hoodie: true }))
-          }
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setParallaxOffset(window.scrollY * 0.5)
+          ticking = false
         })
-      }, observerOptions)
-
-      if (journeyRef.current) observer.observe(journeyRef.current)
-      if (philosophyRef.current) observer.observe(philosophyRef.current)
-      if (craftsmanshipRef.current) observer.observe(craftsmanshipRef.current)
-      if (hoodieRef.current) observer.observe(hoodieRef.current)
-
-      return () => observer.disconnect()
+        ticking = true
+      }
     }
 
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const observerOptions = {
+      threshold: 0.3,
+      rootMargin: '0px 0px -100px 0px',
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.target === journeyRef.current && entry.isIntersecting) {
+          setScrollVisibility((prev) => ({ ...prev, journey: true }))
+        }
+        if (entry.target === philosophyRef.current && entry.isIntersecting) {
+          setScrollVisibility((prev) => ({ ...prev, philosophy: true }))
+        }
+        if (entry.target === craftsmanshipRef.current && entry.isIntersecting) {
+          setScrollVisibility((prev) => ({ ...prev, craftsmanship: true }))
+        }
+        if (entry.target === hoodieRef.current && entry.isIntersecting) {
+          setScrollVisibility((prev) => ({ ...prev, hoodie: true }))
+        }
+      })
+    }, observerOptions)
+
+    if (journeyRef.current) observer.observe(journeyRef.current)
+    if (philosophyRef.current) observer.observe(philosophyRef.current)
+    if (craftsmanshipRef.current) observer.observe(craftsmanshipRef.current)
+    if (hoodieRef.current) observer.observe(hoodieRef.current)
+
+    return () => observer.disconnect()
   }, [])
 
   return (

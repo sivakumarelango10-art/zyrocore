@@ -53,8 +53,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const product = await getProduct(id)
   if (!product) return { title: 'Product Not Found' }
   return {
-    title: `${product.name} — ShopMart`,
-    description: product.description || `Buy ${product.name} at ShopMart`,
+    title: `${product.name} — ZYRØCORE`,
+    description: product.description || `Buy ${product.name} at ZYRØCORE`,
   }
 }
 

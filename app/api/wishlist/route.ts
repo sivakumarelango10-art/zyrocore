@@ -9,7 +9,7 @@ export async function GET() {
 
     const items = await sql`
       SELECT wi.*, p.id as product_id, p.name, p.price, p.discount_price, p.images, p.stock, p.rating, p.rating_count
-      FROM wishlist_items wi
+      FROM wishlists wi
       JOIN products p ON wi.product_id = p.id
       WHERE wi.user_id = ${user.id}
       ORDER BY wi.created_at DESC
@@ -33,14 +33,14 @@ export async function POST(req: NextRequest) {
     }
 
     const existing = await sql`
-      SELECT id FROM wishlist_items WHERE user_id = ${user.id} AND product_id = ${product_id}
+      SELECT id FROM wishlists WHERE user_id = ${user.id} AND product_id = ${product_id}
     `
     if (existing.length > 0) {
-      await sql`DELETE FROM wishlist_items WHERE user_id = ${user.id} AND product_id = ${product_id}`
+      await sql`DELETE FROM wishlists WHERE user_id = ${user.id} AND product_id = ${product_id}`
       return NextResponse.json({ action: 'removed' })
     }
 
-    await sql`INSERT INTO wishlist_items (user_id, product_id) VALUES (${user.id}, ${product_id})`
+    await sql`INSERT INTO wishlists (user_id, product_id) VALUES (${user.id}, ${product_id})`
     return NextResponse.json({ action: 'added' })
   } catch (error) {
     console.error('[wishlist POST] error:', error)

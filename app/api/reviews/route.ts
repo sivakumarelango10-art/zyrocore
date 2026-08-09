@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       FROM reviews
       WHERE product_id = ${product_id}
     `
-    const count = parseInt(stats[0].count)
+    const count = parseInt(stats.count)
     const avg = parseFloat(parseFloat(stats.avg_rating).toFixed(2))
 
     await sql`
