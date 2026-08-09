@@ -1,0 +1,406 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Pure black and white theme */
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ffffff;
+  --muted: #404040;
+  --muted-foreground: #999999;
+  --accent: #ffffff;
+  --accent-foreground: #000000;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #ffffff;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #1a1a1a;
+  --sidebar-ring: #ffffff;
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ffffff;
+  --muted: #404040;
+  --muted-foreground: #999999;
+  --accent: #ffffff;
+  --accent-foreground: #000000;
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #ffffff;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #1a1a1a;
+  --sidebar-ring: #ffffff;
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'ui-sans-serif', 'system-ui', sans-serif;
+  --font-mono: 'ui-monospace', 'SFMono-Regular', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+    /* Prevent text size adjustment on orientation change (Android/iOS) */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html {
+    /* Momentum scrolling for iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent overscroll bounce on the root */
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    overscroll-behavior-y: none;
+    /* Prevent horizontal scroll on body */
+    overflow-x: hidden;
+    /* Ensure content fills dynamic viewport on iOS */
+    min-height: 100dvh;
+  }
+
+  /* Prevent iOS Safari auto-zooming on form input focus */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+
+  /* Restore font-size for desktop */
+  @media (min-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    textarea,
+    select {
+      font-size: inherit;
+    }
+  }
+}
+
+/* ===================================================
+   Premium Animations & Luxury Styles — ZYRØCORE
+   =================================================== */
+
+/* Luxury Image Crossfade & Scale Transitions */
+@keyframes imageHeroFadeScale {
+  0% {
+    opacity: 0;
+    transform: scale(1.08) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes imageHeroExitScale {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Page entrance — clean lightweight fade */
+@keyframes pageSlideIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Scroll-reveal — content rising into view */
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fade-in only */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Shimmer loading skeleton */
+@keyframes shimmer {
+  0%   { background-position: -1000px 0; }
+  100% { background-position:  1000px 0; }
+}
+
+/* Gentle pulse for badges/indicators */
+@keyframes softPulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.04); }
+}
+
+/* Micro press for buttons */
+@keyframes buttonPress {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+/* Slide in from left */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Slide in from right */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Lightweight page transitions */
+  main {
+    animation: fadeIn 350ms ease-out both;
+  }
+
+  /* Smooth focus rings */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
+  }
+
+  /* Links — default smooth transition */
+  a:not([class*="Button"]):not([class*="button"]):not([role="button"]):not([class*="btn"]) {
+    @apply transition-colors duration-200;
+  }
+
+  /* Smooth button hover/active states with touch feedback */
+  button, [role="button"] {
+    @apply transition-all duration-200 active:scale-[0.97];
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  /* Hero image transition helpers */
+  .hero-slide-enter {
+    animation: imageHeroFadeScale 1000ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .hero-slide-exit {
+    animation: imageHeroExitScale 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Page-level animation */
+  .animate-page-in {
+    animation: pageSlideIn 350ms ease-out both;
+  }
+
+  /* Scroll-triggered reveals */
+  .animate-reveal-up {
+    animation: revealUp 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-in {
+    animation: fadeIn 400ms ease-out both;
+  }
+  .animate-slide-left {
+    animation: slideInLeft 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-slide-right {
+    animation: slideInRight 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Shimmer skeleton loader */
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.10) 40%,
+      rgba(255,255,255,0.04) 80%
+    );
+    background-size: 1000px 100%;
+  }
+
+  /* Soft pulse for notification dots, badges */
+  .animate-soft-pulse {
+    animation: softPulse 2.4s ease-in-out infinite;
+  }
+
+  /* Button micro-press */
+  .animate-button-press {
+    animation: buttonPress 220ms ease-out;
+  }
+
+  /* Generic transition helpers */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Card hover guards — only execute hover lifts on pointer devices with real hover capabilities */
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+  @media (hover: hover) {
+    .hover-lift:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    }
+  }
+
+  /* Scale on hover */
+  .hover-scale {
+    @apply transition-transform duration-250;
+  }
+  @media (hover: hover) {
+    .hover-scale:hover {
+      transform: scale(1.04);
+    }
+  }
+
+  /* Safe Area Inset Helpers for iPhone Dynamic Island & Bottom Bar */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  .pl-safe {
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+  .pr-safe {
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  /* Safe padding for fixed bottom bars (tighter) */
+  .pb-safe-bar {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  /* Dynamic viewport height — fixes iOS Safari address bar collapse */
+  .h-dvh  { height: 100dvh; }
+  .min-h-dvh { min-height: 100dvh; }
+  .h-svh  { height: 100svh; }
+  .min-h-svh { min-height: 100svh; }
+
+  /* Custom scrollbar hiding */
+  .scrollbar-hide::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide,
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Horizontal scroll containers — prevent page scroll interference */
+  .scroll-x-contain {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Vertical scroll containers — momentum + contain */
+  .scroll-y-momentum {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Staggered child entrance animations */
+  .stagger-children > * {
+    animation: revealUp 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger-children > :nth-child(1) { animation-delay:  80ms; }
+  .stagger-children > :nth-child(2) { animation-delay: 160ms; }
+  .stagger-children > :nth-child(3) { animation-delay: 240ms; }
+  .stagger-children > :nth-child(4) { animation-delay: 320ms; }
+  .stagger-children > :nth-child(5) { animation-delay: 400ms; }
+  .stagger-children > :nth-child(6) { animation-delay: 480ms; }
+  .stagger-children > :nth-child(7) { animation-delay: 560ms; }
+  .stagger-children > :nth-child(8) { animation-delay: 640ms; }
+}
