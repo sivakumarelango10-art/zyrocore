@@ -7,17 +7,18 @@ export default function proxy(req: NextRequest) {
   // Generate a random cryptographic nonce using crypto.randomUUID()
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
 
-  // Strict Content Security Policy (CSP) - removing unsafe-inline and unsafe-eval
+  // Strict Content Security Policy (CSP) allowing Razorpay, Supabase, Google
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' ${process.env.NODE_ENV !== 'production' ? "'unsafe-eval'" : ''} https://va.vercel-scripts.com;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://va.vercel-scripts.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src 'self' https://fonts.gstatic.com;
-    img-src 'self' data: blob: https://*.supabase.co https://*.public.blob.vercel-storage.com https://blob.vercel-storage.com https://lh3.googleusercontent.com;
-    connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://nominatim.openstreetmap.org https://maps.googleapis.com https://accounts.google.com;
-    frame-ancestors 'none';
+    img-src 'self' data: blob: https: http:;
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://va.vercel-scripts.com https://nominatim.openstreetmap.org https://maps.googleapis.com https://accounts.google.com;
+    frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com;
+    worker-src 'self' blob:;
     base-uri 'self';
-    form-action 'self' https://*.supabase.co https://accounts.google.com;
+    form-action 'self' https://*.supabase.co https://accounts.google.com https://checkout.razorpay.com;
   `.replace(/\s{2,}/g, ' ').trim()
 
   // Apply Security Headers to all responses
@@ -37,7 +38,7 @@ export default function proxy(req: NextRequest) {
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.headers.set('X-XSS-Protection', '1; mode=block')
-  res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)')
+  res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com")')
   res.headers.set('Content-Security-Policy', cspHeader)
 
   // Public admin endpoints (logout only)

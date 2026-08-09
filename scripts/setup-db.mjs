@@ -24,7 +24,18 @@ if (fs.existsSync(envLocalPath)) {
 }
 
 const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || ''
-const sql = postgres(dbUrl, { ssl: 'require' })
+if (!dbUrl) {
+  console.warn('[setup-db] No DATABASE_URL or DIRECT_URL provided. Skipping schema setup during build.')
+  process.exit(0)
+}
+
+let sql
+try {
+  sql = postgres(dbUrl, { ssl: 'require', connect_timeout: 10 })
+} catch (err) {
+  console.warn('[setup-db] Could not initialize Postgres connection:', err)
+  process.exit(0)
+}
 
 console.log('Creating database schema...')
 
