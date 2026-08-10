@@ -4,8 +4,37 @@ import { cookies } from 'next/headers'
 import { randomBytes } from 'crypto'
 import sql from '@/lib/db'
 
+function getCallbackOrigin(request: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL.trim()
+    if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
+      appUrl = `https://${appUrl}`
+    }
+    return appUrl.replace(/\/$/, '')
+  }
+
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const proto = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+
+  if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+    return `${proto}://${host}`
+  }
+
+  const reqOrigin = request.nextUrl?.origin || new URL(request.url).origin
+  if (reqOrigin && !reqOrigin.includes('localhost') && !reqOrigin.includes('127.0.0.1')) {
+    return reqOrigin
+  }
+
+  if (host) {
+    return `${proto}://${host}`
+  }
+
+  return reqOrigin
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = getCallbackOrigin(request)
   const code = searchParams.get('code')
   const errorParam = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
