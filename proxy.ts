@@ -1,6 +1,34 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+function getProxyOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL.trim()
+    if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
+      appUrl = `https://${appUrl}`
+    }
+    return appUrl.replace(/\/$/, '')
+  }
+
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
+  const proto = req.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+
+  if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+    return `${proto}://${host}`
+  }
+
+  const reqOrigin = req.nextUrl?.origin || new URL(req.url).origin
+  if (reqOrigin && !reqOrigin.includes('localhost') && !reqOrigin.includes('127.0.0.1')) {
+    return reqOrigin
+  }
+
+  if (host) {
+    return `${proto}://${host}`
+  }
+
+  return reqOrigin
+}
+
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
@@ -50,8 +78,8 @@ export default function proxy(req: NextRequest) {
   if (pathname.startsWith('/secure-admin') || pathname.startsWith('/admin')) {
     const token = req.cookies.get('session_id')?.value || req.cookies.get('adminToken')?.value
     if (!token) {
-      const loginUrl = req.nextUrl.clone()
-      loginUrl.pathname = '/login'
+      const origin = getProxyOrigin(req)
+      const loginUrl = new URL('/login', origin)
       loginUrl.searchParams.set('from', pathname)
       return NextResponse.redirect(loginUrl)
     }

@@ -70,10 +70,11 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ user, token: sessionId })
 
+    const isHttps = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'
     response.cookies.set('session_id', sessionId, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production' && isHttps,
+      sameSite: 'lax',
       expires: expiresAt,
       path: '/',
     })

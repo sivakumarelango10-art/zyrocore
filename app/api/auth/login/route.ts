@@ -124,10 +124,11 @@ export async function POST(req: NextRequest) {
       redirectTo,
     })
 
+    const isHttps = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'
     const cookieOpts = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      secure: process.env.NODE_ENV === 'production' && isHttps,
+      sameSite: 'lax' as const,
       expires: expiresAt,
       path: '/',
     }

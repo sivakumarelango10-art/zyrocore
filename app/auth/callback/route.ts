@@ -141,10 +141,11 @@ export async function GET(request: NextRequest) {
           const targetPath = userRole === 'admin' ? '/secure-admin' : (next.startsWith('/') ? next : '/account')
           const response = NextResponse.redirect(`${origin}${targetPath}`)
 
+          const isHttps = request.nextUrl.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https'
           const cookieOpts = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict' as const,
+            secure: process.env.NODE_ENV === 'production' && isHttps,
+            sameSite: 'lax' as const,
             expires: expiresAt,
             path: '/',
           }
