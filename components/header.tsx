@@ -142,6 +142,52 @@ export default function Header() {
     }
   }, [pathname])
 
+  // Automatic scroll spy: Shift active navigation highlight between Journey and Contact when scrolling
+  useEffect(() => {
+    if (pathname !== '/story' && pathname !== '/journey') return
+
+    const checkAndObserve = () => {
+      const contactEl = document.getElementById('contact')
+      if (!contactEl) return null
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              setCurrentHash('#contact')
+              if (window.location.hash !== '#contact') {
+                window.history.replaceState(null, '', '#contact')
+              }
+            } else {
+              const rect = contactEl.getBoundingClientRect()
+              if (rect.top > 0) {
+                setCurrentHash('#journey')
+                if (window.location.hash === '#contact') {
+                  window.history.replaceState(null, '', '#journey')
+                }
+              }
+            }
+          })
+        },
+        {
+          rootMargin: '-20% 0px -40% 0px',
+          threshold: 0.1,
+        }
+      )
+
+      observer.observe(contactEl)
+      return observer
+    }
+
+    const observer = checkAndObserve()
+    const timer = setTimeout(checkAndObserve, 500) // Fallback if section renders asynchronously
+
+    return () => {
+      clearTimeout(timer)
+      observer?.disconnect()
+    }
+  }, [pathname])
+
   const isNavActive = (href: string) => {
     const [basePath, targetHash] = href.split('#')
     const hasHash = Boolean(targetHash)
