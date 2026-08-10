@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const errorParam = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
-  const next = searchParams.get('next') ?? searchParams.get('from') ?? '/account'
+  const next = searchParams.get('next') ?? searchParams.get('from') ?? '/'
 
   if (errorParam || errorDescription) {
     const errorMsg = errorDescription || errorParam || 'Authentication failed'
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
             VALUES (${sessionId}, ${userId}, ${expiresAt.toISOString()})
           `
 
-          const targetPath = userRole === 'admin' ? '/secure-admin' : (next.startsWith('/') ? next : '/account')
+          const targetPath = userRole === 'admin' ? '/secure-admin' : (next.startsWith('/') ? next : '/')
           const response = NextResponse.redirect(`${origin}${targetPath}`)
 
           const isHttps = request.nextUrl.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https'
