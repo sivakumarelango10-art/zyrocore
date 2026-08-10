@@ -38,12 +38,12 @@ export default function proxy(req: NextRequest) {
   // Strict Content Security Policy (CSP) allowing Razorpay, Supabase, Google
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://va.vercel-scripts.com;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://va.vercel-scripts.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src 'self' https://fonts.gstatic.com;
     img-src 'self' data: blob: https: http:;
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://va.vercel-scripts.com https://nominatim.openstreetmap.org https://maps.googleapis.com https://accounts.google.com;
-    frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com;
+    connect-src 'self' https://*.razorpay.com https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://va.vercel-scripts.com https://nominatim.openstreetmap.org https://maps.googleapis.com https://accounts.google.com;
+    frame-src 'self' https://*.razorpay.com https://checkout.razorpay.com https://api.razorpay.com;
     worker-src 'self' blob:;
     base-uri 'self';
     form-action 'self' https://*.supabase.co https://accounts.google.com https://checkout.razorpay.com;
