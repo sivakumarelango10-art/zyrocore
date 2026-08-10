@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/utils-shop'
 import { useAuth } from '@/components/auth-provider'
-import { getCurrentLocationAddress } from '@/lib/google-maps'
+import { getCurrentLocationAddress, fetchAddressByPincode, matchIndianState } from '@/lib/google-maps'
 import { toast } from 'sonner'
 
 const INDIAN_STATES = [
@@ -85,9 +85,12 @@ export default function CheckoutPage() {
   })
   const [saveToProfile, setSaveToProfile] = useState(true)
 
+  const [loadingPincode, setLoadingPincode] = useState(false)
+
   // Auto-fill form from saved profile details when user is loaded
   useEffect(() => {
     if (user) {
+      const pin = user.zip || ''
       setForm(f => ({
         ...f,
         name: f.name || user.name || '',
@@ -95,10 +98,47 @@ export default function CheckoutPage() {
         address: f.address || user.address || '',
         city: f.city || user.city || '',
         state: f.state || user.state || '',
-        pincode: f.pincode || user.zip || '',
+        pincode: f.pincode || pin,
       }))
+      if (pin && pin.length === 6 && (!user.city || !user.state)) {
+        fetchAddressByPincode(pin).then(geo => {
+          if (geo) {
+            setForm(f => ({
+              ...f,
+              city: f.city || geo.city,
+              district: f.district || geo.district,
+              state: f.state || matchIndianState(geo.state),
+            }))
+          }
+        })
+      }
     }
   }, [user])
+
+  const handlePincodeChange = async (val: string) => {
+    const cleanVal = val.replace(/\D/g, '').slice(0, 6)
+    setForm(f => ({ ...f, pincode: cleanVal }))
+
+    if (cleanVal.length === 6) {
+      setLoadingPincode(true)
+      try {
+        const geo = await fetchAddressByPincode(cleanVal)
+        if (geo) {
+          setForm(f => ({
+            ...f,
+            city: geo.city || f.city,
+            district: geo.district || f.district,
+            state: matchIndianState(geo.state) || f.state,
+          }))
+          toast.success(`Auto-filled city, district & state for PIN ${cleanVal}`)
+        }
+      } catch {
+        // Non-fatal
+      } finally {
+        setLoadingPincode(false)
+      }
+    }
+  }
 
   const [placing, setPlacing] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -355,8 +395,11 @@ export default function CheckoutPage() {
                       <Input id="landmark" value={form.landmark} onChange={e => handleChange('landmark', e.target.value)} placeholder="Near bus stop, school, etc." suppressHydrationWarning />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="pincode">PIN Code *</Label>
-                      <Input id="pincode" inputMode="numeric" maxLength={6} value={form.pincode} onChange={e => handleChange('pincode', e.target.value.replace(/\D/g, ''))} required placeholder="600001" suppressHydrationWarning />
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="pincode">PIN Code *</Label>
+                        {loadingPincode && <span className="text-[11px] font-medium text-primary animate-pulse">Auto-filling location...</span>}
+                      </div>
+                      <Input id="pincode" inputMode="numeric" maxLength={6} value={form.pincode} onChange={e => handlePincodeChange(e.target.value)} required placeholder="600001" suppressHydrationWarning />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="city">City / Town *</Label>

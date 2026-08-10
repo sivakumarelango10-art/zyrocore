@@ -119,3 +119,105 @@ export async function getCurrentLocationAddress(): Promise<GeocodedAddress> {
     )
   })
 }
+
+export interface PincodeDetails {
+  city: string
+  district: string
+  state: string
+  pincode: string
+}
+
+const INDIAN_STATES_LIST = [
+  'Andaman & Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+  'Chandigarh', 'Chhattisgarh', 'Dadra & Nagar Haveli & Daman & Diu', 'Delhi', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan',
+  'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
+  'West Bengal'
+]
+
+export function matchIndianState(rawState: string): string {
+  if (!rawState) return ''
+  const clean = rawState.trim().toLowerCase()
+  const exact = INDIAN_STATES_LIST.find(s => s.toLowerCase() === clean)
+  if (exact) return exact
+
+  if (clean.includes('tamil')) return 'Tamil Nadu'
+  if (clean.includes('karnataka')) return 'Karnataka'
+  if (clean.includes('kerala')) return 'Kerala'
+  if (clean.includes('delhi')) return 'Delhi'
+  if (clean.includes('maharashtra')) return 'Maharashtra'
+  if (clean.includes('andhra')) return 'Andhra Pradesh'
+  if (clean.includes('telangana')) return 'Telangana'
+  if (clean.includes('gujarat')) return 'Gujarat'
+  if (clean.includes('rajasthan')) return 'Rajasthan'
+  if (clean.includes('bengal')) return 'West Bengal'
+  if (clean.includes('punjab')) return 'Punjab'
+  if (clean.includes('haryana')) return 'Haryana'
+  if (clean.includes('uttar pradesh')) return 'Uttar Pradesh'
+  if (clean.includes('madhya')) return 'Madhya Pradesh'
+  if (clean.includes('bihar')) return 'Bihar'
+  if (clean.includes('odisha') || clean.includes('orissa')) return 'Odisha'
+  if (clean.includes('puducherry') || clean.includes('pondicherry')) return 'Puducherry'
+
+  return INDIAN_STATES_LIST.find(s => s.toLowerCase().includes(clean) || clean.includes(s.toLowerCase())) || rawState
+}
+
+export async function fetchAddressByPincode(pincode: string): Promise<PincodeDetails | null> {
+  const cleanPin = pincode.trim()
+  if (!/^\d{6}$/.test(cleanPin)) return null
+
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${cleanPin}`)
+    const data = await res.json()
+
+    if (Array.isArray(data) && data[0]?.Status === 'Success' && Array.isArray(data[0]?.PostOffice) && data[0].PostOffice.length > 0) {
+      const poList = data[0].PostOffice
+      const primaryPO = poList.find((po: any) => po.DeliveryStatus === 'Delivery') || poList[0]
+
+      const district = primaryPO.District || ''
+      const state = primaryPO.State || ''
+      const rawBlock = primaryPO.Block && primaryPO.Block !== 'NA' ? primaryPO.Block : ''
+      const rawDivision = primaryPO.Division && primaryPO.Division !== 'NA' ? primaryPO.Division.replace(/ (GPO|HO|SO|BO)/i, '') : ''
+      const rawName = primaryPO.Name && primaryPO.Name !== 'NA' ? primaryPO.Name.trim() : ''
+
+      const city = rawBlock || rawDivision || rawName || district
+
+      return {
+        city: city.trim(),
+        district: (district || city).trim(),
+        state: matchIndianState(state),
+        pincode: cleanPin,
+      }
+    }
+  } catch (err) {
+    console.warn('[pincode lookup error]:', err)
+  }
+
+  try {
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${cleanPin}&country=India&format=json&addressdetails=1`
+    )
+    const nomData = await nomRes.json()
+    if (Array.isArray(nomData) && nomData.length > 0 && nomData[0].address) {
+      const addr = nomData[0].address
+      const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || ''
+      const district = addr.county || addr.state_district || city
+      const state = addr.state || ''
+
+      if (city || state) {
+        return {
+          city: city.trim() || 'City',
+          district: (district || city).trim(),
+          state: matchIndianState(state),
+          pincode: cleanPin,
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[pincode nominatim lookup error]:', err)
+  }
+
+  return null
+}

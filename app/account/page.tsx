@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { formatPrice, formatDate, getOrderStatusColor, safeFetcher, safeParseJson } from '@/lib/utils-shop'
 import { useAuth } from '@/components/auth-provider'
-import { getCurrentLocationAddress } from '@/lib/google-maps'
+import { getCurrentLocationAddress, fetchAddressByPincode, matchIndianState } from '@/lib/google-maps'
 import { toast } from 'sonner'
 import type { Order } from '@/lib/types'
 
@@ -28,6 +28,7 @@ export default function AccountPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [loadingPincode, setLoadingPincode] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -50,8 +51,43 @@ export default function AccountPage() {
         zip: user.zip || '',
         newPassword: '',
       })
+      if (user.zip && user.zip.length === 6 && (!user.city || !user.state)) {
+        fetchAddressByPincode(user.zip).then(geo => {
+          if (geo) {
+            setFormData(prev => ({
+              ...prev,
+              city: prev.city || geo.city,
+              state: prev.state || matchIndianState(geo.state),
+            }))
+          }
+        })
+      }
     }
   }, [user])
+
+  const handleZipChange = async (val: string) => {
+    const cleanVal = val.replace(/\D/g, '').slice(0, 6)
+    setFormData(prev => ({ ...prev, zip: cleanVal }))
+
+    if (cleanVal.length === 6) {
+      setLoadingPincode(true)
+      try {
+        const geo = await fetchAddressByPincode(cleanVal)
+        if (geo) {
+          setFormData(prev => ({
+            ...prev,
+            city: geo.city || prev.city,
+            state: matchIndianState(geo.state) || prev.state,
+          }))
+          toast.success(`Auto-filled city & state for PIN ${cleanVal}`)
+        }
+      } catch {
+        // Non-fatal
+      } finally {
+        setLoadingPincode(false)
+      }
+    }
+  }
 
   const handleUseLocation = async () => {
     setLocating(true)
@@ -256,13 +292,15 @@ export default function AccountPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                      ZIP / PIN Code
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center justify-between">
+                      <span>ZIP / PIN Code</span>
+                      {loadingPincode && <span className="text-[11px] font-normal text-primary animate-pulse">Auto-filling...</span>}
                     </label>
                     <Input
                       value={formData.zip}
-                      onChange={e => setFormData({ ...formData, zip: e.target.value })}
+                      onChange={e => handleZipChange(e.target.value)}
                       placeholder="600001"
+                      maxLength={6}
                     />
                   </div>
                 </div>
