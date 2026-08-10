@@ -23,8 +23,8 @@ export const env = {
   SUPABASE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_W9cuxwB1dHTy3FxAIPVWLw_Xv3MQV00',
   DATABASE_URL: process.env.DATABASE_URL || '',
   JWT_SECRET: process.env.JWT_SECRET || '',
-  RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TNEPLzymZxz3kW',
-  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'uO6uJ48p5i2CsFgw2hGnsx2J',
+  RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || 'rzp_test_TNwSqkorc3pJAL',
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'xGzYghCi9qBcAUyib26Abor8',
   NODE_ENV: process.env.NODE_ENV || 'development',
 }
 
