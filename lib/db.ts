@@ -10,6 +10,7 @@ const sql = globalForDb.sql ?? postgres(dbUrl, {
   ssl: 'require',
   max: 10,
   idle_timeout: 20,
+  prepare: false,
 })
 
 if (process.env.NODE_ENV !== 'production') {

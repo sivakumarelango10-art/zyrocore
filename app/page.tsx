@@ -40,11 +40,15 @@ async function getHomepageData() {
       ` as Promise<any[]>
     ])
     
+    const newArrivalsList = Array.isArray(newArrivals) ? newArrivals : []
+    const featuredList = Array.isArray(featured) ? featured : []
+    const bestSellersList = Array.isArray(bestSellers) ? bestSellers : []
+    
     return {
-      newArrivals: newArrivals as unknown as Product[],
-      featured: featured as unknown as Product[],
-      bestSellers: bestSellers as unknown as Product[],
-      hasProducts: newArrivals.length > 0
+      newArrivals: newArrivalsList as unknown as Product[],
+      featured: featuredList as unknown as Product[],
+      bestSellers: bestSellersList as unknown as Product[],
+      hasProducts: newArrivalsList.length > 0
     }
   } catch (err) {
     console.error('[homepage data fetch error]:', err)
