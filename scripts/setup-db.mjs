@@ -220,6 +220,21 @@ try {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS payment_settings (
+      id SERIAL PRIMARY KEY,
+      upi_id VARCHAR(255),
+      qr_image_url TEXT,
+      business_name VARCHAR(255),
+      razorpay_key_id VARCHAR(255),
+      razorpay_key_secret VARCHAR(255),
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `
+  await sql`ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS razorpay_key_id VARCHAR(255)`
+  await sql`ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS razorpay_key_secret VARCHAR(255)`
+
   // Indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_products_featured ON products(is_featured)`
