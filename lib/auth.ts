@@ -15,7 +15,7 @@ export const getSession = cache(async (): Promise<AuthUser | null> => {
     if (bearerToken) {
       try {
         const rows = await sql`
-          SELECT u.id, u.name, u.email, u.role, u.phone, u.address, u.city, u.state, u.zip
+          SELECT u.id, u.name, u.email, u.role, u.phone, u.address, u.city, u.state, u.zip, u.avatar_url
           FROM sessions s
           JOIN users u ON s.user_id = u.id
           WHERE s.id = ${bearerToken}
@@ -42,7 +42,7 @@ export const getSession = cache(async (): Promise<AuthUser | null> => {
 
   try {
     const rows = await sql`
-      SELECT u.id, u.name, u.email, u.role, u.phone, u.address, u.city, u.state, u.zip
+      SELECT u.id, u.name, u.email, u.role, u.phone, u.address, u.city, u.state, u.zip, u.avatar_url
       FROM sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.id = ${sessionId}

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Package, PackagePlus, ShoppingBag,
-  Layers, BarChart2, FileText, Users, LogOut, Bell, ChevronRight, Menu, X, QrCode,
+  Layers, BarChart2, FileText, Users, LogOut, Bell, ChevronRight, Menu, X, QrCode, User,
 } from 'lucide-react'
 import { useAdminAuth } from './admin-auth-provider'
 import { useState } from 'react'
@@ -20,6 +20,7 @@ const NAV = [
   { href: '/secure-admin/analytics',  label: 'Analytics',   icon: BarChart2,       exact: false },
   { href: '/secure-admin/reports',    label: 'Reports',     icon: FileText,        exact: false },
   { href: '/secure-admin/payment-settings', label: 'Payments', icon: QrCode,        exact: false },
+  { href: '/secure-admin/profile',    label: 'Profile',     icon: User,            exact: false },
 ]
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -90,15 +91,23 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           Logout
         </button>
         {user && (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-black text-xs font-bold flex-shrink-0">
-              {user.name.charAt(0).toUpperCase()}
+          <Link
+            href="/secure-admin/profile"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-900 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-black text-xs font-bold flex-shrink-0 overflow-hidden border border-neutral-700">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                user.name.charAt(0).toUpperCase()
+              )}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-white font-medium truncate">{user.name}</p>
               <p className="text-[10px] text-neutral-500 truncate">{user.email}</p>
             </div>
-          </div>
+          </Link>
         )}
       </div>
     </aside>

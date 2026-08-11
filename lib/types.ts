@@ -5,6 +5,7 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  avatar_url?: string | null
   created_at: string
 }
 
@@ -108,6 +109,7 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  avatar_url?: string | null
   phone?: string | null
   address?: string | null
   city?: string | null

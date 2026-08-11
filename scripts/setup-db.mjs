@@ -67,6 +67,7 @@ try {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100)`
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100)`
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS zip VARCHAR(20)`
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT`
 
   await sql`
     CREATE TABLE IF NOT EXISTS categories (
