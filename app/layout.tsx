@@ -18,7 +18,26 @@ export const metadata: Metadata = {
       : 'https://www.zyrocore.in'
   ),
   title: 'ZYRØCORE — Built for Ambitious',
-  description: 'ZYRØCORE delivers premium clothing, activewear, and timeless fashion for the ambitious. Discover handcrafted apparel designed for performance and everyday style.',
+  description: 'Discover ZYRØCORE — a timeless minimalist clothing brand built for ambitious people. Clean, effortless essentials designed to outlast trends.',
+  keywords: [
+    'ZYRØCORE',
+    'ZYROCORE',
+    'timeless clothing',
+    'minimalist clothing brand',
+    'minimalist clothing',
+    'timeless fashion',
+    'minimalist fashion',
+    'premium minimalist clothing',
+    'oversized t-shirts',
+    'heavyweight hoodies',
+    'timeless t-shirts',
+    'minimalist hoodies',
+    'clothing brand India',
+    'Indian clothing brand',
+    'clothing brand from Tamil Nadu',
+    'Zyrocore',
+    'zyrocore',
+  ],
   alternates: {
     canonical: 'https://www.zyrocore.in/',
   },
@@ -34,7 +53,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'ZYRØCORE — Built for Ambitious',
-    description: 'ZYRØCORE delivers premium clothing, activewear, and timeless fashion for the ambitious. Discover handcrafted apparel designed for performance and everyday style.',
+    description: 'Discover ZYRØCORE — a timeless minimalist clothing brand built for ambitious people. Clean, effortless essentials designed to outlast trends.',
     url: 'https://www.zyrocore.in/',
     siteName: 'ZYRØCORE',
     images: [
@@ -83,7 +102,7 @@ const jsonLd = {
       '@id': 'https://www.zyrocore.in/#website',
       url: 'https://www.zyrocore.in/',
       name: 'ZYRØCORE',
-      description: 'Built for Ambitious. Discover premium clothing, activewear, and accessories at ZYRØCORE.',
+      description: 'Discover ZYRØCORE — a timeless minimalist clothing brand built for ambitious people. Clean, effortless essentials designed to outlast trends.',
       publisher: {
         '@id': 'https://www.zyrocore.in/#organization',
       },
