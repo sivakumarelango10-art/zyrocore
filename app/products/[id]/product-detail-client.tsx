@@ -108,8 +108,8 @@ export default function ProductDetailClient({ product, related }: Props) {
     userReview: Review | null
   }>({
     reviews: [],
-    totalReviews: product.rating_count || 0,
-    averageRating: product.rating || 0,
+    totalReviews: Number(product.rating_count) || 0,
+    averageRating: Number(product.rating) || 0,
     breakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
     userReview: null,
   })
@@ -521,11 +521,11 @@ export default function ProductDetailClient({ product, related }: Props) {
               {STAR_INDICES.map(i => (
                 <Star
                   key={i}
-                  className={`w-4 h-4 ${i < Math.round(reviewsData.averageRating) ? 'fill-foreground text-foreground' : 'text-border'}`}
+                  className={`w-4 h-4 ${i < Math.round(Number(reviewsData.averageRating) || 0) ? 'fill-foreground text-foreground' : 'text-border'}`}
                 />
               ))}
             </div>
-            <span className="text-sm font-bold">{reviewsData.averageRating > 0 ? reviewsData.averageRating.toFixed(1) : 'New'}</span>
+            <span className="text-sm font-bold">{Number(reviewsData.averageRating) > 0 ? Number(reviewsData.averageRating).toFixed(1) : 'New'}</span>
             <span className="text-sm text-muted-foreground">({reviewsData.totalReviews} customer rating{reviewsData.totalReviews === 1 ? '' : 's'})</span>
           </div>
 
@@ -776,13 +776,13 @@ export default function ProductDetailClient({ product, related }: Props) {
           {/* Overall Rating Score Card */}
           <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center">
             <p className="text-5xl font-black text-foreground mb-2">
-              {reviewsData.averageRating > 0 ? reviewsData.averageRating.toFixed(1) : '0.0'}
+              {Number(reviewsData.averageRating) > 0 ? Number(reviewsData.averageRating).toFixed(1) : '0.0'}
             </p>
             <div className="flex items-center gap-1 mb-2">
               {STAR_INDICES.map(i => (
                 <Star
                   key={i}
-                  className={`w-5 h-5 ${i < Math.round(reviewsData.averageRating) ? 'fill-foreground text-foreground' : 'text-border'}`}
+                  className={`w-5 h-5 ${i < Math.round(Number(reviewsData.averageRating) || 0) ? 'fill-foreground text-foreground' : 'text-border'}`}
                 />
               ))}
             </div>

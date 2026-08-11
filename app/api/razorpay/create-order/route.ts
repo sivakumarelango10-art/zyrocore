@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
     const order = orders[0]
     const amountInPaise = Math.round(Number(order.total) * 100)
 
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID || 'rzp_test_TNwSqkorc3pJAL'
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET || 'xGzYghCi9qBcAUyib26Abor8'
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
 
     const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
 

@@ -255,22 +255,11 @@ try {
   await sql`
     INSERT INTO users (name, email, password_hash, role, status)
     VALUES (${name}, ${email}, ${hash}, 'admin', 'active')
-    ON CONFLICT (email) DO UPDATE
-      SET password_hash = EXCLUDED.password_hash,
-          role = 'admin',
-          name = EXCLUDED.name,
-          status = 'active'
+    ON CONFLICT (email) DO NOTHING
   `
 
-  console.log('[✓] Admin user created/verified:', email)
-  console.log('')
-  console.log('===================================')
-  console.log('  ZYRØCORE Database Setup Complete!')
-  console.log('===================================')
-  console.log('  Admin Email:    ', email)
-  console.log('  Admin Password:  Globe@200')
-  console.log('  Login at:        /secure-admin/login')
-  console.log('===================================')
+  console.log('[✓] Admin user checked/created:', email)
+  console.log('[✓] Database schema setup complete.')
 } catch (err) {
   console.warn('[setup-db] Database setup encountered an error (will not block build):', err)
 } finally {

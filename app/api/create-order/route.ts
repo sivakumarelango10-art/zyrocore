@@ -9,8 +9,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const { amount, currency = 'INR', receipt, order_id } = body
 
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID || 'rzp_test_TNwSqkorc3pJAL'
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET || 'xGzYghCi9qBcAUyib26Abor8'
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
 
     if (!keyId || !keySecret) {
       console.error('[create-order] Missing Razorpay API keys')

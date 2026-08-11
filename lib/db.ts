@@ -11,6 +11,14 @@ const sql = globalForDb.sql ?? postgres(dbUrl, {
   max: 10,
   idle_timeout: 20,
   prepare: false,
+  types: {
+    numeric: {
+      to: 1700,
+      from: [1700],
+      parse: (x: string) => (x === null ? 0 : parseFloat(x)),
+      serialize: (x: any) => String(x),
+    },
+  },
 })
 
 if (process.env.NODE_ENV !== 'production') {

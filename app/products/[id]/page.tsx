@@ -8,6 +8,16 @@ import type { Product } from '@/lib/types'
 
 export const revalidate = 3600 // 1 hour ISR
 
+function formatProduct(p: any): Product {
+  return {
+    ...p,
+    price: Number(p.price) || 0,
+    discount_price: p.discount_price != null ? Number(p.discount_price) : null,
+    rating: Number(p.rating) || 0,
+    rating_count: Number(p.rating_count) || 0,
+  }
+}
+
 // Wrap getProduct in React cache to deduplicate database fetches
 const getProduct = cache(async (id: string): Promise<Product | null> => {
   try {
@@ -17,13 +27,13 @@ const getProduct = cache(async (id: string): Promise<Product | null> => {
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.id = ${parseInt(id)}
     `
-    return rows[0] as Product || null
+    return rows[0] ? formatProduct(rows[0]) : null
   } catch {
     return null
   }
 })
 
-async function getRelated(product: Product): Promise<Product[]> {
+const getRelated = cache(async (product: Product): Promise<Product[]> => {
   try {
     const rows = await sql`
       SELECT p.*, c.name as category_name, c.slug as category_slug
@@ -33,11 +43,11 @@ async function getRelated(product: Product): Promise<Product[]> {
       ORDER BY p.rating DESC
       LIMIT 4
     `
-    return rows as unknown as Product[]
+    return rows.map(formatProduct)
   } catch {
     return []
   }
-}
+})
 
 export async function generateStaticParams() {
   try {
