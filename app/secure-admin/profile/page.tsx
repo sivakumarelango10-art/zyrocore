@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   User, Camera, Trash2, ShieldCheck, KeyRound, Save, CheckCircle2, XCircle, AlertCircle, Eye, EyeOff, Loader2, RefreshCw
 } from 'lucide-react'
+import AdminShell from '../admin-shell'
 import { useAdminAuth } from '../admin-auth-provider'
 
 export default function AdminProfilePage() {
@@ -280,17 +281,20 @@ export default function AdminProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex items-center gap-3 text-neutral-500 text-sm font-medium">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Loading admin profile...
+      <AdminShell>
+        <div className="p-6 flex items-center justify-center py-20">
+          <div className="flex items-center gap-3 text-neutral-500 text-sm font-medium">
+            <Loader2 className="w-5 h-5 animate-spin text-black" />
+            Loading admin profile...
+          </div>
         </div>
-      </div>
+      </AdminShell>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <AdminShell>
+      <div className="p-6 max-w-4xl space-y-8 pb-12">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-neutral-500 uppercase mb-1">
@@ -595,5 +599,6 @@ export default function AdminProfilePage() {
         </div>
       </div>
     </div>
+  </AdminShell>
   )
 }
