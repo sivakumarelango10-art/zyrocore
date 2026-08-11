@@ -3,10 +3,11 @@ import Footer from '@/components/footer'
 import HeroSection from './home/hero-section'
 import BannerStrip from './home/banner-strip'
 import NewArrivalsSection from './home/new-arrivals-section'
+import BrandStorySection from './home/brand-story-section'
 import sql from '@/lib/db'
 import type { Product } from '@/lib/types'
 
-export const revalidate = 60
+export const revalidate = 3600 // 1 hour ISR for fast edge response time (<500ms)
 
 async function getHomeProducts(): Promise<Product[]> {
   try {
@@ -46,13 +47,35 @@ async function getHomeProducts(): Promise<Product[]> {
 export default async function HomePage() {
   const homeProducts = await getHomeProducts()
 
+  const productSchemas = homeProducts.map(product => ({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || `${product.name} — Premium activewear by ZYRØCORE.`,
+    image: product.images?.[0] || 'https://www.zyrocore.in/logo-emblem.png',
+    offers: {
+      '@type': 'Offer',
+      price: product.discount_price || product.price,
+      priceCurrency: 'INR',
+      availability: product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      url: `https://www.zyrocore.in/products/${product.id}`,
+    },
+  }))
+
   return (
     <div className="min-h-screen flex flex-col">
+      {productSchemas.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchemas) }}
+        />
+      )}
       <Header />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <HeroSection />
         <BannerStrip />
         <NewArrivalsSection products={homeProducts} />
+        <BrandStorySection />
       </main>
       <Footer />
     </div>

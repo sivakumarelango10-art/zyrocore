@@ -18,7 +18,10 @@ export const metadata: Metadata = {
       : 'https://www.zyrocore.in'
   ),
   title: 'ZYRØCORE — Built for Ambitious',
-  description: 'Built for Ambitious. Discover premium clothing, activewear, and accessories at ZYRØCORE.',
+  description: 'ZYRØCORE delivers premium clothing, activewear, and timeless fashion for the ambitious. Discover handcrafted apparel designed for performance and everyday style.',
+  alternates: {
+    canonical: 'https://www.zyrocore.in/',
+  },
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -31,7 +34,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'ZYRØCORE — Built for Ambitious',
-    description: 'Built for Ambitious. Discover premium clothing, activewear, and accessories at ZYRØCORE.',
+    description: 'ZYRØCORE delivers premium clothing, activewear, and timeless fashion for the ambitious. Discover handcrafted apparel designed for performance and everyday style.',
+    url: 'https://www.zyrocore.in/',
     siteName: 'ZYRØCORE',
     images: [
       {
@@ -57,6 +61,41 @@ export const viewport: Viewport = {
   ],
 }
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://www.zyrocore.in/#organization',
+      name: 'ZYRØCORE',
+      url: 'https://www.zyrocore.in/',
+      logo: 'https://www.zyrocore.in/logo-emblem.png',
+      sameAs: ['https://www.instagram.com/zyrocore.official/'],
+      contactPoint: {
+        '@type': 'ContactPoint',
+        telephone: '+91-63698-63301',
+        contactType: 'customer service',
+        email: 'bpzyrocore@gmail.com',
+      },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://www.zyrocore.in/#website',
+      url: 'https://www.zyrocore.in/',
+      name: 'ZYRØCORE',
+      description: 'Built for Ambitious. Discover premium clothing, activewear, and accessories at ZYRØCORE.',
+      publisher: {
+        '@id': 'https://www.zyrocore.in/#organization',
+      },
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: 'https://www.zyrocore.in/products?search={search_term_string}',
+        'query-input': 'required name=search_term_string',
+      },
+    },
+  ],
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -66,8 +105,25 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="preconnect" href="https://fdtituksbcprvduaskii.supabase.co" crossOrigin="anonymous" />
+        <link
+          rel="preload"
+          as="image"
+          href="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/product2-MrjpbiVDhc1Nnt7rEHuFQpWG0mjnmu.png"
+          // @ts-ignore fetchpriority is valid HTML attribute
+          fetchpriority="high"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className={`${inter.className} font-sans antialiased bg-background text-foreground`}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-background focus:text-foreground focus:outline-none focus:ring-2 focus:ring-accent border border-border rounded-md m-2"
+        >
+          Skip to main content
+        </a>
         <AuthProvider>
           <CartProvider>
             {children}

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compress: true,
   experimental: {
     // Tree-shake icon libraries — only bundles icons that are actually imported
     optimizePackageImports: ['lucide-react'],

@@ -76,6 +76,8 @@ export default function InstagramFloat() {
               <img
                 src="/instagram-qr.jpg"
                 alt="Instagram @ZYROCORE.OFFICIAL QR Code"
+                width={176}
+                height={176}
                 className="w-44 h-auto object-contain rounded-lg"
               />
             </div>

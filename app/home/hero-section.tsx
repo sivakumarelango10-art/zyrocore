@@ -63,6 +63,8 @@ export default function HeroSection() {
               alt={s.title}
               fill
               priority={idx === 0}
+              // @ts-ignore fetchpriority HTML attribute
+              fetchPriority={idx === 0 ? 'high' : undefined}
               loading={idx === 0 ? undefined : 'lazy'}
               sizes="(max-width: 768px) 100vw, 50vw"
               className="object-cover object-center"
@@ -99,12 +101,21 @@ export default function HeroSection() {
                     : 'opacity-0 translate-y-4 absolute inset-0 z-0 pointer-events-none'
                 }`}
               >
-                <h1
-                  className="font-bold tracking-tight text-foreground leading-[1.05]"
-                  style={{ fontSize: 'clamp(1.75rem, 6vw, 4.5rem)' }}
-                >
-                  {s.title}
-                </h1>
+                {idx === 0 ? (
+                  <h1
+                    className="font-bold tracking-tight text-foreground leading-[1.05]"
+                    style={{ fontSize: 'clamp(1.75rem, 6vw, 4.5rem)' }}
+                  >
+                    {s.title}
+                  </h1>
+                ) : (
+                  <h2
+                    className="font-bold tracking-tight text-foreground leading-[1.05]"
+                    style={{ fontSize: 'clamp(1.75rem, 6vw, 4.5rem)' }}
+                  >
+                    {s.title}
+                  </h2>
+                )}
                 <p
                   className="text-muted-foreground mt-3 font-light leading-relaxed"
                   style={{ fontSize: 'clamp(0.875rem, 2.5vw, 1.25rem)' }}

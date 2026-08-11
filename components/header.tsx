@@ -219,15 +219,20 @@ export default function Header() {
       {/* Main header */}
       <div className="max-w-7xl mx-auto px-4 h-20 flex items-center gap-4 sm:gap-6">
         {/* Logo */}
-        <Link href="/" className="flex-shrink-0 flex items-center">
+        <Link href="/" className="flex-shrink-0 flex items-center" aria-label="ZYRØCORE Homepage">
           <ZyrocoreLogo size="md" />
         </Link>
 
         {/* Desktop Search */}
         <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl mx-4">
           <div className="relative w-full">
+            <label htmlFor="desktop-search-input" className="sr-only">
+              Search clothing, activewear...
+            </label>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              id="desktop-search-input"
+              aria-label="Search clothing, activewear..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search clothing, activewear..."
@@ -364,7 +369,7 @@ export default function Header() {
               {/* Header inside drawer */}
               <div className="flex items-center justify-between pb-4 border-b border-border">
                 <h2 id={mobileDrawerTitleId} className="sr-only">Navigation menu</h2>
-                <Link href="/" onClick={() => setMobileOpen(false)}>
+                <Link href="/" onClick={() => setMobileOpen(false)} aria-label="ZYRØCORE Homepage">
                   <ZyrocoreLogo size="sm" />
                 </Link>
                 <button
@@ -378,8 +383,13 @@ export default function Header() {
 
               {/* Mobile Search Input */}
               <form onSubmit={handleSearch} className="relative">
+                <label htmlFor="mobile-search-input" className="sr-only">
+                  Search products
+                </label>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  id="mobile-search-input"
+                  aria-label="Search products"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search products..."
