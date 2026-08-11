@@ -61,8 +61,10 @@ export default function AdminOrdersPage() {
     }, 15000)
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => clearInterval(interval)
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const filtered = orders.filter(o => {

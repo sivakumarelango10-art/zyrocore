@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET || 'xGzYghCi9qBcAUyib26Abor8'
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
 
     if (!keySecret) {
       console.error('[verify-payment] RAZORPAY_KEY_SECRET is missing')
@@ -43,9 +43,12 @@ export async function POST(req: NextRequest) {
     // Optional database integration if order_id is present
     if (order_id) {
       const user = await getSession()
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 })
+      }
 
       const existingOrders = await sql`
-        SELECT id, payment_status FROM orders WHERE id = ${order_id} ${user ? sql`AND user_id = ${user.id}` : sql``} LIMIT 1
+        SELECT id, payment_status FROM orders WHERE id = ${order_id} AND user_id = ${user.id} LIMIT 1
       `
 
       if (existingOrders.length > 0) {

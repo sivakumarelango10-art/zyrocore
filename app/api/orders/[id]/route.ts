@@ -8,15 +8,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await params
-    const orders = await sql`
-      SELECT o.* FROM orders o
-      WHERE o.id = ${parseInt(id)} AND (o.user_id = ${user.id} OR ${user.role} = 'admin')
-    `
+    const orderIdNum = parseInt(id)
+    if (isNaN(orderIdNum)) {
+      return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
+    }
+
+    const orders = user.role === 'admin'
+      ? await sql`SELECT o.* FROM orders o WHERE o.id = ${orderIdNum}`
+      : await sql`SELECT o.* FROM orders o WHERE o.id = ${orderIdNum} AND o.user_id = ${user.id}`
     if (orders.length === 0) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const items = await sql`SELECT * FROM order_items WHERE order_id = ${parseInt(id)}`
+    const items = await sql`SELECT * FROM order_items WHERE order_id = ${orderIdNum}`
 
     return NextResponse.json({ order: { ...orders[0], items } })
   } catch (error) {

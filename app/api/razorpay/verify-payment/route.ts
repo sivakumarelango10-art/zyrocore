@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required Razorpay payment details' }, { status: 400 })
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET || 'xGzYghCi9qBcAUyib26Abor8'
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
 
     // 1. Timing-safe HMAC SHA-256 Signature Verification
     const expectedSignature = crypto
