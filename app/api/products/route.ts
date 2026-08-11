@@ -15,122 +15,124 @@ export async function GET(req: NextRequest) {
 
     // Validate and sanitize sort parameter
     const rawSort = searchParams.get('sort') ?? 'newest'
-    const sort: SortOption = VALID_SORTS.includes(rawSort as SortOption) ? rawSort as SortOption : 'newest'
+    const sort: SortOption = VALID_SORTS.includes(rawSort as SortOption) ? (rawSort as SortOption) : 'newest'
 
     // Validate and sanitize pagination
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1') || 1)
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '12') || 12))
     const offset = (page - 1) * limit
 
-    let products
-    let countResult
+    let productsPromise
+    let countPromise
 
     if (search) {
       const searchTerm = `%${search}%`
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.name ILIKE ${searchTerm} OR p.description ILIKE ${searchTerm}
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`
+      countPromise = sql`
         SELECT COUNT(*) FROM products
         WHERE name ILIKE ${searchTerm} OR description ILIKE ${searchTerm}
       `
     } else if (category) {
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
         WHERE c.slug = ${category}
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`
+      countPromise = sql`
         SELECT COUNT(*) FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE c.slug = ${category}
       `
     } else if (featured === 'true') {
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.is_featured = true
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`SELECT COUNT(*) FROM products WHERE is_featured = true`
+      countPromise = sql`SELECT COUNT(*) FROM products WHERE is_featured = true`
     } else if (bestSeller === 'true') {
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.is_best_seller = true
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`SELECT COUNT(*) FROM products WHERE is_best_seller = true`
+      countPromise = sql`SELECT COUNT(*) FROM products WHERE is_best_seller = true`
     } else if (showOnHome === 'true') {
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.show_on_home = true
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`SELECT COUNT(*) FROM products WHERE show_on_home = true`
+      countPromise = sql`SELECT COUNT(*) FROM products WHERE show_on_home = true`
     } else {
       const base = sql`
-        SELECT p.*, c.name as category_name, c.slug as category_slug
+        SELECT p.id, p.name, p.description, p.price, p.discount_price, p.category_id, p.images, p.stock, p.rating, p.rating_count, p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, c.name as category_name, c.slug as category_slug
         FROM products p LEFT JOIN categories c ON p.category_id = c.id
       `
       if (sort === 'price_asc') {
-        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'price_desc') {
-        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
       } else if (sort === 'rating') {
-        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
       } else {
-        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        productsPromise = sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
-      countResult = await sql`SELECT COUNT(*) FROM products`
+      countPromise = sql`SELECT COUNT(*) FROM products`
     }
 
-    const total = parseInt(countResult[0].count)
+    const [products, countResult] = await Promise.all([productsPromise, countPromise])
+
+    const total = parseInt(countResult[0]?.count || '0')
 
     return NextResponse.json(
       {
@@ -150,4 +152,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
