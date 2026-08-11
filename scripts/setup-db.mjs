@@ -96,10 +96,12 @@ try {
       size_stock JSONB DEFAULT '{}'::jsonb,
       is_featured BOOLEAN DEFAULT false,
       is_best_seller BOOLEAN DEFAULT false,
+      show_on_home BOOLEAN DEFAULT false,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS show_on_home BOOLEAN DEFAULT false`
 
   await sql`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -239,6 +241,7 @@ try {
   await sql`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_products_featured ON products(is_featured)`
   await sql`CREATE INDEX IF NOT EXISTS idx_products_best_seller ON products(is_best_seller)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_show_on_home ON products(show_on_home)`
   await sql`CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC)`
   await sql`CREATE INDEX IF NOT EXISTS idx_cart_user ON cart_items(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)`

@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')
     const featured = searchParams.get('featured')
     const bestSeller = searchParams.get('best_seller')
+    const showOnHome = searchParams.get('show_on_home')
 
     // Validate and sanitize sort parameter
     const rawSort = searchParams.get('sort') ?? 'newest'
@@ -96,6 +97,22 @@ export async function GET(req: NextRequest) {
         products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
       }
       countResult = await sql`SELECT COUNT(*) FROM products WHERE is_best_seller = true`
+    } else if (showOnHome === 'true') {
+      const base = sql`
+        SELECT p.*, c.name as category_name, c.slug as category_slug
+        FROM products p LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.show_on_home = true
+      `
+      if (sort === 'price_asc') {
+        products = await sql`${base} ORDER BY p.price ASC LIMIT ${limit} OFFSET ${offset}`
+      } else if (sort === 'price_desc') {
+        products = await sql`${base} ORDER BY p.price DESC LIMIT ${limit} OFFSET ${offset}`
+      } else if (sort === 'rating') {
+        products = await sql`${base} ORDER BY p.rating DESC LIMIT ${limit} OFFSET ${offset}`
+      } else {
+        products = await sql`${base} ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+      }
+      countResult = await sql`SELECT COUNT(*) FROM products WHERE show_on_home = true`
     } else {
       const base = sql`
         SELECT p.*, c.name as category_name, c.slug as category_slug

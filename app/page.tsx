@@ -8,18 +8,19 @@ import type { Product } from '@/lib/types'
 
 export const revalidate = 60
 
-async function getNewArrivals(): Promise<Product[]> {
+async function getHomeProducts(): Promise<Product[]> {
   try {
     const rawProducts = await sql`
       SELECT 
         p.id, p.name, p.description, p.price, p.discount_price, 
         p.category_id, p.images, p.stock, p.rating, p.rating_count, 
-        p.is_featured, p.is_best_seller, p.created_at, 
+        p.is_featured, p.is_best_seller, p.show_on_home, p.created_at, 
         c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.show_on_home = true
       ORDER BY p.created_at DESC
-      LIMIT 8
+      LIMIT 12
     ` as any[]
 
     if (!Array.isArray(rawProducts)) return []
@@ -37,13 +38,13 @@ async function getNewArrivals(): Promise<Product[]> {
         : [],
     })) as Product[]
   } catch (err) {
-    console.error('[HomePage] getNewArrivals error:', err)
+    console.error('[HomePage] getHomeProducts error:', err)
     return []
   }
 }
 
 export default async function HomePage() {
-  const newArrivals = await getNewArrivals()
+  const homeProducts = await getHomeProducts()
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -51,7 +52,7 @@ export default async function HomePage() {
       <main className="flex-1">
         <HeroSection />
         <BannerStrip />
-        <NewArrivalsSection products={newArrivals} />
+        <NewArrivalsSection products={homeProducts} />
       </main>
       <Footer />
     </div>

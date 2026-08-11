@@ -21,7 +21,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const name = typeof data.name === 'string' ? data.name.trim() : ''
     const price = typeof data.price === 'number' ? data.price : parseFloat(data.price)
-    
+
     if (!name) {
       return NextResponse.json({ error: 'Product name is required' }, { status: 400 })
     }
@@ -42,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const is_featured = Boolean(data.is_featured)
     const is_best_seller = Boolean(data.is_best_seller)
+    const show_on_home = Boolean(data.show_on_home ?? data.is_show_on_home)
 
     const updated = await sql`
       UPDATE products SET
@@ -57,6 +58,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         size_stock = ${sizeStockJson}::jsonb,
         is_featured = ${is_featured},
         is_best_seller = ${is_best_seller},
+        show_on_home = ${show_on_home},
         updated_at = NOW()
       WHERE id = ${productId}
       RETURNING *
@@ -83,6 +85,53 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     console.error('[admin/products PUT] unexpected error:', error)
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin()
+    const { id } = await params
+    const productId = parseInt(id)
+    if (isNaN(productId)) {
+      return NextResponse.json({ error: 'Invalid product ID' }, { status: 400 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const { show_on_home, is_featured, is_best_seller } = body
+
+    const updates: any[] = []
+
+    if (typeof show_on_home === 'boolean') {
+      await sql`UPDATE products SET show_on_home = ${show_on_home}, updated_at = NOW() WHERE id = ${productId}`
+    }
+    if (typeof is_featured === 'boolean') {
+      await sql`UPDATE products SET is_featured = ${is_featured}, updated_at = NOW() WHERE id = ${productId}`
+    }
+    if (typeof is_best_seller === 'boolean') {
+      await sql`UPDATE products SET is_best_seller = ${is_best_seller}, updated_at = NOW() WHERE id = ${productId}`
+    }
+
+    const updated = await sql`SELECT * FROM products WHERE id = ${productId}`
+    if (updated.length === 0) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    revalidatePath('/')
+    revalidatePath('/products')
+    revalidatePath('/shop')
+    revalidatePath(`/products/${productId}`)
+
+    return NextResponse.json({ success: true, product: updated[0] })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'error'
+    if (msg === 'UNAUTHORIZED') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (msg === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 

@@ -35,6 +35,7 @@ export interface Product {
   size_stock?: Record<string, number>
   is_featured: boolean
   is_best_seller: boolean
+  show_on_home?: boolean
   created_at: string
   updated_at: string
 }

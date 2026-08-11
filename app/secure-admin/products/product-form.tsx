@@ -46,6 +46,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
     sizes: isEdit ? [] : ['S', 'M', 'L', 'XL', 'XXL'],
     is_featured: false,
     is_best_seller: false,
+    show_on_home: false,
   })
 
   const [sizeStock, setSizeStock] = useState<Record<string, number>>(
@@ -258,6 +259,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
           sizes: p.sizes || [],
           is_featured: p.is_featured,
           is_best_seller: p.is_best_seller,
+          show_on_home: p.show_on_home ?? false,
         })
 
         if (p.product_details) {
@@ -424,6 +426,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
       size_stock: sizeStock,
       is_featured: form.is_featured,
       is_best_seller: form.is_best_seller,
+      show_on_home: form.show_on_home,
     }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -837,6 +840,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
               {[
                 { key: 'is_featured', label: 'Featured Product' },
                 { key: 'is_best_seller', label: 'Best Seller' },
+                { key: 'show_on_home', label: 'Show on Home' },
               ].map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input

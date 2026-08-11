@@ -75,17 +75,18 @@ export async function POST(req: NextRequest) {
 
     const is_featured = Boolean(data.is_featured)
     const is_best_seller = Boolean(data.is_best_seller)
+    const show_on_home = Boolean(data.show_on_home ?? data.is_show_on_home)
 
     const products = await sql`
       INSERT INTO products (
         name, description, price, discount_price, category_id, images, stock, sizes,
-        product_details, size_stock, is_featured, is_best_seller
+        product_details, size_stock, is_featured, is_best_seller, show_on_home
       )
       VALUES (
         ${name}, ${description}, ${price}, ${discount_price},
         ${category_id}, ${images}, ${stock},
         ${sizes}, ${productDetailsJson}::jsonb, ${sizeStockJson}::jsonb,
-        ${is_featured}, ${is_best_seller}
+        ${is_featured}, ${is_best_seller}, ${show_on_home}
       )
       RETURNING *
     `

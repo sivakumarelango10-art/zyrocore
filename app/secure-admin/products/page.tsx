@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminShell from '../admin-shell'
-import { Plus, Pencil, Trash2, Search, Package } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Package, Home, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-
 import { formatPrice } from '@/lib/utils-shop'
-
 
 const STOCK_BADGE = (stock: number) => {
   if (stock === 0) return 'text-red-700 bg-red-50 border-red-200'
@@ -21,6 +19,7 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -52,6 +51,28 @@ export default function AdminProductsPage() {
     if (res.ok) { toast.success('Product deleted'); load() }
     else toast.error('Failed to delete product')
     setDeletingId(null)
+  }
+
+  const handleToggleShowOnHome = async (p: any) => {
+    setTogglingId(p.id)
+    const nextVal = !p.show_on_home
+    try {
+      const res = await fetch(`/api/admin/products/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_on_home: nextVal }),
+      })
+      if (res.ok) {
+        toast.success(`"${p.name}" ${nextVal ? 'will now show on Home page' : 'removed from Home page'}`)
+        load()
+      } else {
+        toast.error('Failed to update product visibility')
+      }
+    } catch {
+      toast.error('Network error')
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   return (
@@ -103,7 +124,7 @@ export default function AdminProductsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 bg-neutral-50/50">
-                    {['Product', 'Category', 'Price', 'Stock', 'Featured', 'Actions'].map(h => (
+                    {['Product', 'Category', 'Price', 'Stock', 'Flags', 'Show on Home', 'Actions'].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -142,11 +163,33 @@ export default function AdminProductsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {p.is_featured ? (
-                          <span className="text-neutral-800 border border-neutral-300 text-xs bg-neutral-100 px-2 py-0.5 rounded-md font-medium">Featured</span>
-                        ) : (
-                          <span className="text-neutral-300 text-xs">—</span>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {p.is_featured && (
+                            <span className="text-neutral-800 border border-neutral-300 text-[10px] bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">Featured</span>
+                          )}
+                          {p.is_best_seller && (
+                            <span className="text-amber-800 border border-amber-200 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded font-semibold">Best Seller</span>
+                          )}
+                          {!p.is_featured && !p.is_best_seller && (
+                            <span className="text-neutral-400 text-xs">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleShowOnHome(p)}
+                          disabled={togglingId === p.id}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all disabled:opacity-50 ${
+                            p.show_on_home
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-neutral-50 text-neutral-500 border-neutral-200 hover:bg-neutral-100'
+                          }`}
+                          title="Click to toggle homepage visibility"
+                        >
+                          <Home className="w-3.5 h-3.5" />
+                          {p.show_on_home ? 'ON (Home)' : 'OFF'}
+                        </button>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
