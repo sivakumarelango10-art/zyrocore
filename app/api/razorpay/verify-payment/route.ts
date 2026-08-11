@@ -19,7 +19,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required Razorpay payment details' }, { status: 400 })
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+    const settings = await sql`SELECT razorpay_key_secret FROM payment_settings ORDER BY id DESC LIMIT 1`.catch(() => [])
+    const dbKeySecret = settings?.[0]?.razorpay_key_secret
+    const keySecret = dbKeySecret || process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+
+    if (!keySecret) {
+      return NextResponse.json({ error: 'Razorpay Key Secret is not configured' }, { status: 500 })
+    }
 
     // 1. Timing-safe HMAC SHA-256 Signature Verification
     const expectedSignature = crypto
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
       await txSql`
         UPDATE orders
         SET payment_status = 'paid',
-            status = 'processing',
+            status = 'confirmed',
             payment_method = 'Razorpay',
             razorpay_order_id = ${razorpay_order_id},
             razorpay_payment_id = ${razorpay_payment_id},

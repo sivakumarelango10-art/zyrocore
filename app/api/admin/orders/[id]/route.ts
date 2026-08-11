@@ -2,17 +2,35 @@ import { type NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin()
     const { id } = await params
-    const { status, tracking_number } = await req.json()
+    const orderIdNum = parseInt(id)
+    if (isNaN(orderIdNum)) {
+      return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
+    }
 
-    await sql`
-      UPDATE orders SET status = ${status}, tracking_number = ${tracking_number || null}, updated_at = NOW()
-      WHERE id = ${parseInt(id)}
+    const orders = await sql`
+      SELECT o.*, u.name as user_name, u.email as user_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = ${orderIdNum}
+      LIMIT 1
     `
-    return NextResponse.json({ success: true })
+
+    if (orders.length === 0) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    const items = await sql`
+      SELECT oi.*, p.images as product_images
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = ${orderIdNum}
+    `
+
+    return NextResponse.json({ order: { ...orders[0], items } })
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'error'
     if (msg === 'UNAUTHORIZED') {
@@ -21,6 +39,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (msg === 'FORBIDDEN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin()
+    const { id } = await params
+    const orderIdNum = parseInt(id)
+    if (isNaN(orderIdNum)) {
+      return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const { status, tracking_number, courier_name } = body
+
+    const updated = await sql`
+      UPDATE orders
+      SET
+        status = COALESCE(${status || null}, status),
+        tracking_number = ${tracking_number !== undefined ? (tracking_number || null) : sql`tracking_number`},
+        courier_name = ${courier_name !== undefined ? (courier_name || null) : sql`courier_name`},
+        updated_at = NOW()
+      WHERE id = ${orderIdNum}
+      RETURNING *
+    `
+
+    if (updated.length === 0) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, order: updated[0] })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'error'
+    if (msg === 'UNAUTHORIZED') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (msg === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    console.error('[admin/orders/[id] PATCH] Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

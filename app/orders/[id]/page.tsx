@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { use } from 'react'
+import { use, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { CheckCircle, Package, Star } from 'lucide-react'
+import { CheckCircle, Package, Star, Copy, Check, Truck, MapPin } from 'lucide-react'
+import { toast } from 'sonner'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
 import { Button } from '@/components/ui/button'
@@ -21,9 +22,49 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 function OrderDetailContent({ id }: { id: string }) {
   const searchParams = useSearchParams()
   const isSuccess = searchParams.get('success') === '1'
+  const [copied, setCopied] = useState(false)
 
   const { data, isLoading } = useSWR(`/api/orders/${id}`, fetcher)
   const order = data?.order
+
+  const handleCopyTracking = (trackingNum: string) => {
+    if (!trackingNum) return
+
+    const successCallback = () => {
+      setCopied(true)
+      toast.success('Tracking number copied!')
+      setTimeout(() => setCopied(false), 3000)
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(trackingNum).then(successCallback).catch(() => {
+        // Fallback if rejected
+        fallbackCopyTextToClipboard(trackingNum, successCallback)
+      })
+    } else {
+      fallbackCopyTextToClipboard(trackingNum, successCallback)
+    }
+  }
+
+  const fallbackCopyTextToClipboard = (text: string, cb: () => void) => {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.top = '0'
+    textArea.style.left = '0'
+    textArea.style.position = 'fixed'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+      const successful = document.execCommand('copy')
+      if (successful) cb()
+      else toast.error('Failed to copy tracking number')
+    } catch {
+      toast.error('Failed to copy tracking number')
+    }
+    document.body.removeChild(textArea)
+  }
 
   if (isLoading) {
     return (
@@ -52,7 +93,7 @@ function OrderDetailContent({ id }: { id: string }) {
         <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-8 flex items-center gap-3">
           <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
           <div>
-            <p className="font-semibold text-green-800">Order placed successfully!</p>
+            <p className="font-semibold text-green-800">Order placed & payment verified successfully!</p>
             <p className="text-sm text-green-700">Thank you for your order. We{"'"}ll email you when it ships.</p>
           </div>
         </div>
@@ -73,13 +114,48 @@ function OrderDetailContent({ id }: { id: string }) {
           <p className="font-bold">{formatPrice(order.total)}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground mb-0.5">Status</p>
+          <p className="text-xs text-muted-foreground mb-0.5">Order Status</p>
           <p className="font-medium text-sm capitalize">{order.status}</p>
-          {order.tracking_number && (
-            <p className="text-xs text-muted-foreground mt-0.5">Tracking: {order.tracking_number}</p>
-          )}
         </div>
       </div>
+
+      {/* Shipment & Tracking Information Card */}
+      {order.tracking_number && (
+        <div className="bg-card border border-border rounded-xl p-5 mb-6 shadow-2xs space-y-3">
+          <div className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-foreground" />
+            <h2 className="font-semibold text-base">Shipment & Tracking Information</h2>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/40 p-4 rounded-xl border border-border/80">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Courier Service</p>
+              <p className="font-bold text-sm text-foreground">{order.courier_name || 'Standard Courier'}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                Tracking #: <span className="font-semibold text-foreground">{order.tracking_number}</span>
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => handleCopyTracking(order.tracking_number)}
+              variant="outline"
+              size="sm"
+              className="font-semibold text-xs flex items-center gap-2 h-9 px-4 shrink-0"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" /> Copy Tracking Number
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Items */}
       <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
@@ -138,18 +214,31 @@ function OrderDetailContent({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Shipping */}
+      {/* Shipping Address */}
       {order.shipping_name && (
-        <div className="bg-card border border-border rounded-xl p-5 mb-8">
-          <h2 className="font-semibold mb-3">Shipping Address</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {order.shipping_name}<br />
-            {order.shipping_address}<br />
-            {order.shipping_city}, {order.shipping_state} {order.shipping_zip}
-          </p>
-          {order.shipping_phone && (
-            <p className="text-sm text-muted-foreground mt-1">{order.shipping_phone}</p>
-          )}
+        <div className="bg-card border border-border rounded-xl p-5 mb-8 space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <MapPin className="w-4 h-4 text-foreground" />
+            <h2 className="font-semibold">Complete Delivery Address</h2>
+          </div>
+          <div className="text-sm text-muted-foreground leading-relaxed space-y-0.5">
+            <p className="font-semibold text-foreground">{order.shipping_name}</p>
+            <p>{order.shipping_address}</p>
+            {order.shipping_address2 && <p>{order.shipping_address2}</p>}
+            {order.shipping_landmark && <p>Landmark: {order.shipping_landmark}</p>}
+            <p>
+              {[
+                order.shipping_city,
+                order.shipping_district,
+                order.shipping_state,
+                order.shipping_pincode || order.shipping_zip,
+                order.shipping_country || 'India',
+              ].filter(Boolean).join(', ')}
+            </p>
+            {order.shipping_phone && (
+              <p className="pt-1 text-foreground font-medium">Phone: {order.shipping_phone}</p>
+            )}
+          </div>
         </div>
       )}
 

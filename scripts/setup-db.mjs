@@ -162,6 +162,7 @@ try {
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_district VARCHAR(255)`
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_pincode VARCHAR(50)`
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(100) DEFAULT 'India'`
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS courier_name VARCHAR(255)`
 
   await sql`
     CREATE TABLE IF NOT EXISTS order_items (

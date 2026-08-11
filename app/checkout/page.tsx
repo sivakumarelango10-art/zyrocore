@@ -303,15 +303,15 @@ export default function CheckoutPage() {
         },
         modal: {
           ondismiss: function () {
-            toast.info('Razorpay payment window closed.')
+            toast.error('Your payment was not completed, so your order was not placed.')
             setPlacing(false)
           },
         },
       }
 
       const razorpayInstance = new (window as any).Razorpay(options)
-      razorpayInstance.on('payment.failed', function (resp: any) {
-        toast.error(resp.error?.description || 'Payment transaction failed')
+      razorpayInstance.on('payment.failed', function () {
+        toast.error('Your payment was not completed, so your order was not placed.')
         setPlacing(false)
       })
       razorpayInstance.open()

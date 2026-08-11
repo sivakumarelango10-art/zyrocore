@@ -32,8 +32,17 @@ export async function POST(req: NextRequest) {
     const order = orders[0]
     const amountInPaise = Math.round(Number(order.total) * 100)
 
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+    // DB payment settings first, fallback to env variables
+    const settings = await sql`SELECT razorpay_key_id, razorpay_key_secret FROM payment_settings ORDER BY id DESC LIMIT 1`.catch(() => [])
+    const dbKeyId = settings?.[0]?.razorpay_key_id
+    const dbKeySecret = settings?.[0]?.razorpay_key_secret
+
+    const keyId = dbKeyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID
+    const keySecret = dbKeySecret || process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+
+    if (!keyId || !keySecret) {
+      return NextResponse.json({ error: 'Razorpay API keys are not configured' }, { status: 500 })
+    }
 
     const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
 

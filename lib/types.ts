@@ -61,12 +61,22 @@ export interface Order {
   subtotal: number
   shipping_cost: number
   total: number
+  payment_method?: string | null
+  payment_status?: string | null
+  razorpay_order_id?: string | null
+  razorpay_payment_id?: string | null
   shipping_name: string | null
   shipping_phone: string | null
   shipping_address: string | null
+  shipping_address2?: string | null
+  shipping_landmark?: string | null
   shipping_city: string | null
+  shipping_district?: string | null
   shipping_state: string | null
-  shipping_zip: string | null
+  shipping_pincode?: string | null
+  shipping_zip?: string | null
+  shipping_country?: string | null
+  courier_name?: string | null
   tracking_number: string | null
   notes: string | null
   created_at: string
