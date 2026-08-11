@@ -16,6 +16,12 @@ const nextConfig = {
       { protocol: 'https', hostname: 'blob.vercel-storage.com' },
       // Google user content (profile photos, etc.)
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      // Unsplash images
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'plus.unsplash.com' },
+      // Other common image hosts
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: 'https', hostname: 'placehold.co' },
       // Local development
       { protocol: 'http', hostname: 'localhost' },
     ],
