@@ -245,6 +245,7 @@ try {
   await sql`CREATE INDEX IF NOT EXISTS idx_products_show_on_home ON products(show_on_home)`
   await sql`CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC)`
   await sql`CREATE INDEX IF NOT EXISTS idx_cart_user ON cart_items(user_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_cart_user_product_size ON cart_items(user_id, product_id, size)`
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`
   await sql`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`
