@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Validate product exists
     const products = await sql`
-      SELECT id, stock, sizes FROM products WHERE id = ${product_id as number}
+      SELECT id, stock, sizes, size_stock FROM products WHERE id = ${product_id as number}
     `
     if (products.length === 0) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -62,20 +62,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please select a size' }, { status: 400 })
     }
 
-    // 5. Validate stock
-    const stock = product.stock
-    if (stock !== null && stock !== undefined) {
-      if (typeof stock === 'number') {
-        if (stock < qty) {
-          return NextResponse.json({ error: `Only ${stock} item(s) available in stock` }, { status: 400 })
-        }
-      } else if (typeof stock === 'object') {
-        if (size && !(stock as Record<string, number>)[size as string]) {
-          return NextResponse.json({ error: `Size ${size} is out of stock` }, { status: 400 })
-        }
-        if (size && (stock as Record<string, number>)[size as string] < qty) {
-          return NextResponse.json({ error: `Only ${(stock as Record<string, number>)[size as string]} item(s) available in size ${size}` }, { status: 400 })
-        }
+    // 5. Validate size-specific stock and overall stock
+    const sizeStockObj = (typeof product.size_stock === 'object' && product.size_stock !== null) ? product.size_stock : {}
+    if (size) {
+      const availableForSize = Math.max(0, Number(sizeStockObj[size as string]) || 0)
+      if (availableForSize === 0) {
+        return NextResponse.json({ error: `Size ${size} is out of stock.` }, { status: 400 })
+      }
+      if (availableForSize < qty) {
+        return NextResponse.json({ error: `Only ${availableForSize} item(s) available in size ${size}.` }, { status: 400 })
+      }
+    } else {
+      const overallStock = Number(product.stock) || 0
+      if (overallStock < qty) {
+        return NextResponse.json({ error: `Only ${overallStock} item(s) available in stock.` }, { status: 400 })
       }
     }
 

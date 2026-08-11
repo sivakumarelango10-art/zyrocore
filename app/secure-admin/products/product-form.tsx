@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminShell from '../admin-shell'
-import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, AlertTriangle, ListPlus } from 'lucide-react'
+import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, ListPlus, Crop, UploadCloud, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { compressImageFile } from '@/lib/image-compress'
 import { safeParseJson } from '@/lib/utils-shop'
+import ImageCropModal from '@/components/admin/image-crop-modal'
 
 interface ProductFormProps {
   productId?: number
@@ -16,6 +17,14 @@ interface ProductFormProps {
 interface CustomDetail {
   key: string
   value: string
+}
+
+interface StagedImageItem {
+  id: string
+  file: File
+  previewUrl: string
+  fileName: string
+  isCropped?: boolean
 }
 
 export default function ProductForm({ productId }: ProductFormProps) {
@@ -43,7 +52,25 @@ export default function ProductForm({ productId }: ProductFormProps) {
     isEdit ? {} : { S: 0, M: 0, L: 0, XL: 0, XXL: 0 }
   )
 
-  // Product Details (Structured + Custom)
+  // Staged client-side images (not yet uploaded to server)
+  const [stagedImages, setStagedImages] = useState<StagedImageItem[]>([])
+
+  // Crop Modal state
+  const [cropModal, setCropModal] = useState<{
+    isOpen: boolean
+    imageSrc: string
+    fileName: string
+    index: number
+    isExisting: boolean
+  }>({
+    isOpen: false,
+    imageSrc: '',
+    fileName: '',
+    index: -1,
+    isExisting: false,
+  })
+
+  // Details
   const [details, setDetails] = useState({
     material: '',
     fabric: '',
@@ -63,84 +90,150 @@ export default function ProductForm({ productId }: ProductFormProps) {
   const [newValue, setNewValue] = useState('')
 
   const [sizeInput, setSizeInput] = useState('')
-  const [uploadingImages, setUploadingImages] = useState(false)
   const [dragOver, setDragOver] = useState(false)
 
   const set = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }))
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  // Revoke object URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      stagedImages.forEach(img => {
+        if (img.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(img.previewUrl)
+        }
+      })
+    }
+  }, [stagedImages])
+
+  // Select images locally & stage them with preview URLs
+  const handleSelectFiles = (files: FileList | File[]) => {
     const fileArr = Array.from(files)
-    
-    // Validate current image limit (max 6)
-    if (form.images.length >= 6) {
+    const totalCurrentCount = form.images.length + stagedImages.length
+
+    if (totalCurrentCount >= 6) {
       toast.error('Maximum limit of 6 images per product reached.')
       return
     }
 
-    const availableSlots = 6 - form.images.length
+    const availableSlots = 6 - totalCurrentCount
     if (fileArr.length > availableSlots) {
-      toast.error(`You can only add ${availableSlots} more image(s). (Max 6 images per product)`)
+      toast.error(`You can only add ${availableSlots} more image(s). (Max 6 images total)`)
     }
 
-    const filesToUpload = fileArr.slice(0, availableSlots)
-    
-    // Allowed formats: JPG, JPEG, PNG, WEBP, AVIF, SVG
-    const allowedTypes = [
-      'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/avif', 'image/svg+xml'
-    ]
+    const filesToStage = fileArr.slice(0, availableSlots)
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/avif', 'image/svg+xml']
     const allowedExts = /\.(png|jpg|jpeg|webp|avif|svg)$/i
 
-    const validFiles: File[] = []
+    const newStaged: StagedImageItem[] = []
 
-    for (const f of filesToUpload) {
+    for (const f of filesToStage) {
       if (!allowedTypes.includes(f.type.toLowerCase()) && !f.name.match(allowedExts)) {
         toast.error(`File "${f.name}" is not a supported image format (JPG, JPEG, PNG, WEBP, AVIF, SVG).`)
         continue
       }
-      if (f.size > 50 * 1024 * 1024) {
-        toast.error(`File "${f.name}" exceeds the 50MB size limit.`)
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`File "${f.name}" exceeds the 5MB max size limit.`)
         continue
       }
-      validFiles.push(f)
+
+      const previewUrl = URL.createObjectURL(f)
+      newStaged.push({
+        id: `staged-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        file: f,
+        previewUrl,
+        fileName: f.name,
+      })
     }
 
-    if (validFiles.length === 0) return
+    if (newStaged.length > 0) {
+      setStagedImages(prev => [...prev, ...newStaged])
+      toast.success(`${newStaged.length} image(s) staged. Click Save Product to upload.`)
+    }
+  }
 
-    setUploadingImages(true)
-    const uploadedUrls: string[] = []
+  const removeStagedImage = (index: number) => {
+    setStagedImages(prev => {
+      const target = prev[index]
+      if (target && target.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl)
+      }
+      const updated = [...prev]
+      updated.splice(index, 1)
+      return updated
+    })
+  }
 
-    for (const rawFile of validFiles) {
-      const toastId = toast.loading(`Optimizing ${rawFile.name}...`)
-      try {
-        const fileToUpload = await compressImageFile(rawFile, 2000, 0.85)
+  const removeExistingImage = (index: number) => {
+    const updated = [...form.images]
+    updated.splice(index, 1)
+    set('images', updated)
+  }
 
-        toast.loading(`Uploading ${rawFile.name}...`, { id: toastId })
-        const fd = new FormData()
-        fd.append('file', fileToUpload)
-
-        const res = await fetch('/api/admin/upload', {
-          method: 'POST',
-          credentials: 'same-origin',
-          body: fd,
+  // Open Crop Modal for staged file or existing image
+  const openCropModal = (index: number, isExisting: boolean) => {
+    if (isExisting) {
+      const src = form.images[index]
+      setCropModal({
+        isOpen: true,
+        imageSrc: src,
+        fileName: `Product Image #${index + 1}`,
+        index,
+        isExisting: true,
+      })
+    } else {
+      const item = stagedImages[index]
+      if (item) {
+        setCropModal({
+          isOpen: true,
+          imageSrc: item.previewUrl,
+          fileName: item.fileName,
+          index,
+          isExisting: false,
         })
-
-        const data = await safeParseJson(res)
-        if (res.ok && data?.url) {
-          uploadedUrls.push(data.url)
-          toast.success(`${rawFile.name} uploaded successfully!`, { id: toastId })
-        } else {
-          toast.error(data?.error || `Failed to upload ${rawFile.name}`, { id: toastId })
-        }
-      } catch (err) {
-        console.error('Upload exception:', err)
-        toast.error(`Error uploading ${rawFile.name}`, { id: toastId })
       }
     }
+  }
 
-    if (uploadedUrls.length > 0) {
-      set('images', [...form.images, ...uploadedUrls].slice(0, 6))
+  // Handle crop completion
+  const handleCropComplete = (croppedBlob: Blob, croppedUrl: string) => {
+    const { index, isExisting, fileName } = cropModal
+
+    if (isExisting) {
+      // Convert existing remote image into a newly cropped staged file
+      const newFile = new File([croppedBlob], `cropped-${Date.now()}.webp`, { type: 'image/webp' })
+      removeExistingImage(index)
+      setStagedImages(prev => [
+        ...prev,
+        {
+          id: `cropped-${Date.now()}`,
+          file: newFile,
+          previewUrl: croppedUrl,
+          fileName: newFile.name,
+          isCropped: true,
+        },
+      ])
+      toast.success('Image cropped! It will be saved when you update the product.')
+    } else {
+      // Update staged image item
+      setStagedImages(prev => {
+        const updated = [...prev]
+        const target = updated[index]
+        if (target) {
+          if (target.previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(target.previewUrl)
+          }
+          const newFile = new File([croppedBlob], fileName || target.fileName, { type: 'image/webp' })
+          updated[index] = {
+            ...target,
+            file: newFile,
+            previewUrl: croppedUrl,
+            isCropped: true,
+          }
+        }
+        return updated
+      })
+      toast.success('Cropped image applied to staged preview.')
     }
-    setUploadingImages(false)
   }
 
   useEffect(() => {
@@ -155,11 +248,16 @@ export default function ProductForm({ productId }: ProductFormProps) {
       const p = data?.product
       if (p) {
         setForm({
-          name: p.name, description: p.description || '',
-          price: String(p.price), discount_price: p.discount_price ? String(p.discount_price) : '',
+          name: p.name,
+          description: p.description || '',
+          price: String(p.price),
+          discount_price: p.discount_price ? String(p.discount_price) : '',
           category_id: p.category_id ? String(p.category_id) : '',
-          stock: String(p.stock), images: p.images || [], sizes: p.sizes || [],
-          is_featured: p.is_featured, is_best_seller: p.is_best_seller,
+          stock: String(p.stock),
+          images: p.images || [],
+          sizes: p.sizes || [],
+          is_featured: p.is_featured,
+          is_best_seller: p.is_best_seller,
         })
 
         if (p.product_details) {
@@ -196,30 +294,15 @@ export default function ProductForm({ productId }: ProductFormProps) {
     }).finally(() => setLoading(false))
   }, [productId])
 
-  const removeImage = (index: number) => {
-    const updated = [...form.images]
-    updated.splice(index, 1)
-    set('images', updated)
-  }
-
-  const moveImage = (index: number, direction: 'left' | 'right') => {
-    const targetIndex = direction === 'left' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= form.images.length) return
-    const updated = [...form.images]
-    const temp = updated[index]
-    updated[index] = updated[targetIndex]
-    updated[targetIndex] = temp
-    set('images', updated)
-  }
-
   const addSize = () => {
     const s = sizeInput.trim().toUpperCase()
     if (s && !form.sizes.includes(s)) {
       const newSizes = [...form.sizes, s]
       set('sizes', newSizes)
-      const newStock = { ...sizeStock, [s]: sizeStock[s] ?? 10 }
+      const newStock = { ...sizeStock, [s]: sizeStock[s] ?? 0 }
       setSizeStock(newStock)
-      // Auto-update total stock
+
+      // Auto-calculate total stock
       const total = Object.values(newStock).reduce((acc, curr) => acc + (curr || 0), 0)
       set('stock', String(total))
       setSizeInput('')
@@ -232,6 +315,8 @@ export default function ProductForm({ productId }: ProductFormProps) {
     const newStock = { ...sizeStock }
     delete newStock[s]
     setSizeStock(newStock)
+
+    // Auto-calculate total stock
     const total = Object.values(newStock).reduce((acc, curr) => acc + (curr || 0), 0)
     set('stock', String(total))
   }
@@ -240,6 +325,8 @@ export default function ProductForm({ productId }: ProductFormProps) {
     const validQty = Math.max(0, qty)
     const newStock = { ...sizeStock, [size]: validQty }
     setSizeStock(newStock)
+
+    // Auto-calculate total stock
     const total = Object.values(newStock).reduce((acc, curr) => acc + (curr || 0), 0)
     set('stock', String(total))
   }
@@ -266,6 +353,42 @@ export default function ProductForm({ productId }: ProductFormProps) {
     e.preventDefault()
     setSaving(true)
 
+    // Step 1: Upload staged images to server now
+    const newlyUploadedUrls: string[] = []
+    if (stagedImages.length > 0) {
+      for (const item of stagedImages) {
+        const toastId = toast.loading(`Uploading ${item.fileName}...`)
+        try {
+          const fileToUpload = await compressImageFile(item.file, 2000, 0.85)
+          const fd = new FormData()
+          fd.append('file', fileToUpload)
+
+          const res = await fetch('/api/admin/upload', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd,
+          })
+
+          const data = await safeParseJson(res)
+          if (res.ok && data?.url) {
+            newlyUploadedUrls.push(data.url)
+            toast.success(`${item.fileName} uploaded successfully`, { id: toastId })
+          } else {
+            toast.error(data?.error || `Failed to upload ${item.fileName}`, { id: toastId })
+            setSaving(false)
+            return
+          }
+        } catch (err) {
+          console.error('Upload error:', err)
+          toast.error(`Error uploading ${item.fileName}`, { id: toastId })
+          setSaving(false)
+          return
+        }
+      }
+    }
+
+    const finalImageUrls = [...form.images, ...newlyUploadedUrls].slice(0, 6)
+
     // Compile product details object
     const finalDetails: Record<string, string> = {}
     if (details.material) finalDetails['Material'] = details.material
@@ -285,14 +408,17 @@ export default function ProductForm({ productId }: ProductFormProps) {
       if (cd.key && cd.value) finalDetails[cd.key] = cd.value
     })
 
+    // Compute exact overall stock from sizeStock
+    const computedTotalStock = Object.values(sizeStock).reduce((acc, curr) => acc + Math.max(0, Number(curr) || 0), 0)
+
     const payload = {
       name: form.name,
       description: form.description || null,
       price: parseFloat(form.price),
       discount_price: form.discount_price ? parseFloat(form.discount_price) : null,
       category_id: form.category_id ? parseInt(form.category_id) : null,
-      stock: parseInt(form.stock) || 0,
-      images: form.images,
+      stock: computedTotalStock,
+      images: finalImageUrls,
       sizes: form.sizes,
       product_details: finalDetails,
       size_stock: sizeStock,
@@ -339,6 +465,8 @@ export default function ProductForm({ productId }: ProductFormProps) {
     </AdminShell>
   )
 
+  const totalImageCount = form.images.length + stagedImages.length
+
   return (
     <AdminShell>
       <div className="p-6 max-w-4xl">
@@ -373,7 +501,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
             </div>
           </div>
 
-          {/* Pricing & Total Stock */}
+          {/* Pricing & Overall Inventory */}
           <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-sm">
             <h2 className="text-neutral-900 text-sm font-bold">Pricing & Overall Inventory</h2>
             <div className="grid grid-cols-3 gap-4">
@@ -398,6 +526,137 @@ export default function ProductForm({ productId }: ProductFormProps) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Product Media & Image Crop/Preview */}
+          <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-neutral-900 text-sm font-bold">Product Media & Previews</h2>
+                <p className="text-neutral-400 text-xs mt-0.5">Select, preview, crop, and stage product images before saving.</p>
+              </div>
+              <span className="text-xs font-semibold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
+                {totalImageCount} / 6 images
+              </span>
+            </div>
+
+            {totalImageCount < 6 && (
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) handleSelectFiles(e.dataTransfer.files) }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    document.getElementById('img-file-input')?.click()
+                  }
+                }}
+                className={`relative border-2 border-dashed rounded-xl transition-colors cursor-pointer ${
+                  dragOver ? 'border-black bg-neutral-50' : 'border-neutral-200 hover:border-neutral-400'
+                }`}
+                onClick={() => document.getElementById('img-file-input')?.click()}
+              >
+                <input
+                  id="img-file-input"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,.avif,.svg,image/png,image/jpeg,image/webp,image/avif,image/svg+xml"
+                  multiple
+                  className="hidden"
+                  onChange={e => { if (e.target.files?.length) { handleSelectFiles(e.target.files); e.target.value = '' } }}
+                />
+                <div className="flex flex-col items-center justify-center py-8 gap-2 select-none pointer-events-none">
+                  <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4-4a3 3 0 014.24 0L16 16m-2-2l1.59-1.59a3 3 0 014.24 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-neutral-500 text-sm">
+                    <span className="text-black font-semibold underline">Click to select images</span> or drag & drop
+                  </p>
+                  <p className="text-neutral-400 text-xs">JPG, JPEG, PNG, WEBP, AVIF, SVG supported • Max 5MB per file</p>
+                </div>
+              </div>
+            )}
+
+            {/* Staged & Existing Previews Grid */}
+            {totalImageCount > 0 && (
+              <div className="space-y-3 pt-2">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Image Previews ({totalImageCount})</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                  {/* Render Existing Uploaded Images */}
+                  {form.images.map((url, idx) => (
+                    <div key={`existing-${idx}`} className="relative group aspect-square rounded-xl border border-neutral-200 bg-neutral-50 overflow-hidden shadow-sm flex flex-col">
+                      <img src={url} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute top-1.5 left-1.5 bg-black text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow z-10">MAIN</span>
+                      )}
+
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeExistingImage(idx)}
+                            className="p-1 bg-red-600 hover:bg-red-500 text-white rounded-full transition-colors"
+                            title="Remove image"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => openCropModal(idx, true)}
+                            className="px-2.5 py-1 bg-white/90 hover:bg-white text-neutral-900 rounded-lg text-[11px] font-semibold flex items-center gap-1 shadow transition-colors"
+                          >
+                            <Crop className="w-3 h-3" /> Crop
+                          </button>
+                        </div>
+
+                        <div className="text-[10px] text-white/80 truncate text-center font-medium">Uploaded</div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Render Staged Local Images */}
+                  {stagedImages.map((staged, idx) => (
+                    <div key={staged.id} className="relative group aspect-square rounded-xl border-2 border-emerald-500/80 bg-neutral-50 overflow-hidden shadow-sm flex flex-col">
+                      <img src={staged.previewUrl} alt={staged.fileName} className="w-full h-full object-cover" />
+                      <span className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow z-10">
+                        {staged.isCropped ? 'CROPPED' : 'STAGED'}
+                      </span>
+
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeStagedImage(idx)}
+                            className="p-1 bg-red-600 hover:bg-red-500 text-white rounded-full transition-colors"
+                            title="Remove staged image"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => openCropModal(idx, false)}
+                            className="px-2 py-1 bg-white hover:bg-neutral-100 text-neutral-900 rounded-lg text-[11px] font-semibold flex items-center gap-1 shadow transition-colors"
+                          >
+                            <Crop className="w-3 h-3" /> Crop
+                          </button>
+                        </div>
+
+                        <div className="text-[10px] text-white truncate text-center font-medium px-1" title={staged.fileName}>
+                          {staged.fileName}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Product Details & Specifications */}
@@ -505,7 +764,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
           <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-sm">
             <div>
               <h2 className="text-neutral-900 text-sm font-bold">Size-Based Inventory Management</h2>
-              <p className="text-neutral-400 text-xs mt-0.5">Define sizes and specify real-time stock quantities per size.</p>
+              <p className="text-neutral-400 text-xs mt-0.5">Specify independent stock quantities per size. Overall total stock is calculated automatically.</p>
             </div>
 
             <div className="flex gap-2">
@@ -549,13 +808,17 @@ export default function ProductForm({ productId }: ProductFormProps) {
                             min="0"
                             value={currentQty}
                             onChange={e => handleSizeStockChange(s, parseInt(e.target.value) || 0)}
-                            className="w-full bg-white border border-neutral-200 rounded-md px-2.5 py-1 text-neutral-900 text-sm font-mono focus:outline-none focus:border-black"
+                            className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-1.5 text-neutral-900 text-sm font-semibold focus:outline-none focus:border-black transition-colors"
                           />
                         </div>
-                        <div className="col-span-4 text-right flex items-center justify-end gap-1">
-                          {isOut && <span className="text-[10px] font-bold uppercase text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">Out of Stock</span>}
-                          {isLow && <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Low ({currentQty})</span>}
-                          {!isOut && !isLow && <span className="text-[10px] font-bold uppercase text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded">In Stock</span>}
+                        <div className="col-span-4 text-right">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                            isOut ? 'text-red-700 bg-red-50 border border-red-200' :
+                            isLow ? 'text-amber-700 bg-amber-50 border border-amber-200' :
+                            'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                          }`}>
+                            {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
+                          </span>
                         </div>
                       </div>
                     )
@@ -563,116 +826,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-neutral-400 italic">No sizes added yet. Enter sizes above to set per-size inventory.</p>
-            )}
-          </div>
-
-          {/* Product Images (Max 6) */}
-          <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-neutral-900 text-sm font-bold">Product Images ({form.images.length}/6)</h2>
-              <span className="text-neutral-400 text-xs font-medium">JPG, JPEG, PNG, WEBP, AVIF (Max 6 Images)</span>
-            </div>
-
-            {/* Drop zone */}
-            {form.images.length < 6 && (
-              <div
-                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files) }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    if (!uploadingImages) document.getElementById('img-file-input')?.click()
-                  }
-                }}
-                className={`relative border-2 border-dashed rounded-xl transition-colors cursor-pointer ${
-                  dragOver ? 'border-black bg-neutral-50' : 'border-neutral-200 hover:border-neutral-400'
-                }`}
-                onClick={() => !uploadingImages && document.getElementById('img-file-input')?.click()}
-              >
-                <input
-                  id="img-file-input"
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.webp,.avif,.svg,image/png,image/jpeg,image/webp,image/avif,image/svg+xml"
-                  multiple
-                  className="hidden"
-                  onChange={e => { if (e.target.files?.length) { uploadFiles(e.target.files); e.target.value = '' } }}
-                />
-                <div className="flex flex-col items-center justify-center py-8 gap-2 select-none pointer-events-none">
-                  {uploadingImages ? (
-                    <>
-                      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                      <p className="text-neutral-400 text-sm font-medium">Uploading image(s)...</p>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4-4a3 3 0 014.24 0L16 16m-2-2l1.59-1.59a3 3 0 014.24 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <p className="text-neutral-500 text-sm">
-                        <span className="text-black font-semibold underline">Click to upload</span> or drag & drop
-                      </p>
-                      <p className="text-neutral-400 text-xs">JPG, JPEG, PNG, WEBP, AVIF supported • Up to 6 images</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Previews */}
-            {form.images.length > 0 && (
-              <div className="space-y-2 mt-3">
-                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Image Ordering & Previews</p>
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-                  {form.images.map((url, idx) => (
-                    <div key={url + idx} className="relative group aspect-square rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden shadow-sm flex flex-col">
-                      <img
-                        src={url}
-                        alt={`Product preview ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {idx === 0 && (
-                        <span className="absolute top-1 left-1 bg-black text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">MAIN</span>
-                      )}
-
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                        {idx > 0 && (
-                          <button
-                            type="button"
-                            title="Move left"
-                            onClick={() => moveImage(idx, 'left')}
-                            className="w-6 h-6 bg-white/90 hover:bg-white text-black rounded-full flex items-center justify-center shadow transition-colors"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {idx < form.images.length - 1 && (
-                          <button
-                            type="button"
-                            title="Move right"
-                            onClick={() => moveImage(idx, 'right')}
-                            className="w-6 h-6 bg-white/90 hover:bg-white text-black rounded-full flex items-center justify-center shadow transition-colors"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          title="Remove image"
-                          aria-label={`Remove image ${idx + 1}`}
-                          onClick={() => removeImage(idx)}
-                          className="w-6 h-6 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="text-neutral-400 text-xs italic">No sizes added yet.</p>
             )}
           </div>
 
@@ -703,15 +857,25 @@ export default function ProductForm({ productId }: ProductFormProps) {
               type="submit"
               disabled={saving}
               suppressHydrationWarning
-              className="bg-black hover:bg-neutral-900 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm"
+              className="bg-black hover:bg-neutral-900 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2"
             >
-              {saving ? 'Saving...' : isEdit ? 'Update Product' : 'Add Product'}
+              <UploadCloud className="w-4 h-4" />
+              {saving ? 'Uploading & Saving Product...' : isEdit ? 'Update Product' : 'Add Product'}
             </button>
             <Link href="/secure-admin/products" className="text-neutral-500 hover:text-black text-sm font-semibold transition-colors">
               Cancel
             </Link>
           </div>
         </form>
+
+        {/* Crop Modal Component */}
+        <ImageCropModal
+          isOpen={cropModal.isOpen}
+          imageSrc={cropModal.imageSrc}
+          fileName={cropModal.fileName}
+          onClose={() => setCropModal(c => ({ ...c, isOpen: false }))}
+          onCropComplete={handleCropComplete}
+        />
       </div>
     </AdminShell>
   )

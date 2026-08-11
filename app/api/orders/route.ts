@@ -160,15 +160,12 @@ export async function POST(req: NextRequest) {
               ? (product.size_stock as Record<string, number>)
               : {}
 
-          if (Object.keys(parsedSizeStock).length > 0) {
-            // Only block if we actually have size_stock data for this size
-            const availForSize = Number(parsedSizeStock[item.size] ?? -1)
-            if (availForSize !== -1 && availForSize < qty) {
-              return NextResponse.json(
-                { error: `Size ${item.size} of "${product.name}" is out of stock (only ${availForSize} available)` },
-                { status: 400 }
-              )
-            }
+          const availForSize = Math.max(0, Number(parsedSizeStock[item.size]) || 0)
+          if (availForSize < qty) {
+            return NextResponse.json(
+              { error: `Size ${item.size} of "${product.name}" is out of stock (only ${availForSize} available).` },
+              { status: 400 }
+            )
           }
         }
 
