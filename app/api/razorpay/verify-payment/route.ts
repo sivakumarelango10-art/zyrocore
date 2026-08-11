@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import sql from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { env } from '@/lib/env'
+import { revalidatePath } from 'next/cache'
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,26 +80,43 @@ export async function POST(req: NextRequest) {
 
       for (const item of orderItems) {
         if (item.product_id) {
-          await txSql`
-            UPDATE products
-            SET stock = GREATEST(0, stock - ${item.quantity})
-            WHERE id = ${item.product_id}
-          `
-
           if (item.size) {
-            try {
-              await txSql`
-                UPDATE products
-                SET size_stock = jsonb_set(
-                  COALESCE(size_stock, '{}'::jsonb),
-                  ARRAY[${item.size}]::text[],
-                  to_jsonb(GREATEST(0, COALESCE((size_stock->>${item.size})::int, 0) - ${item.quantity}))
-                )
-                WHERE id = ${item.product_id}
-              `
-            } catch (err) {
-              console.warn('[verify-payment] Non-fatal size_stock update warning:', err)
-            }
+            await txSql`
+              UPDATE products
+              SET size_stock = jsonb_set(
+                    COALESCE(size_stock, '{}'::jsonb),
+                    ARRAY[${item.size}]::text[],
+                    to_jsonb(GREATEST(0, COALESCE((size_stock->>${item.size})::int, 0) - ${item.quantity}))
+                  ),
+                  stock = (
+                    SELECT COALESCE(SUM(val::int), 0)
+                    FROM jsonb_each_text(
+                      jsonb_set(
+                        COALESCE(size_stock, '{}'::jsonb),
+                        ARRAY[${item.size}]::text[],
+                        to_jsonb(GREATEST(0, COALESCE((size_stock->>${item.size})::int, 0) - ${item.quantity}))
+                      )
+                    ) AS t(key, val)
+                  ),
+                  updated_at = NOW()
+              WHERE id = ${item.product_id}
+            `
+          } else {
+            await txSql`
+              UPDATE products
+              SET stock = GREATEST(0, stock - ${item.quantity}),
+                  updated_at = NOW()
+              WHERE id = ${item.product_id}
+            `
+          }
+
+          try {
+            revalidatePath('/')
+            revalidatePath('/products')
+            revalidatePath('/shop')
+            revalidatePath(`/products/${item.product_id}`)
+          } catch (revalErr) {
+            console.warn('[verify-payment] Revalidation warning:', revalErr)
           }
         }
       }

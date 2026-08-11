@@ -70,9 +70,10 @@ export default function InventoryPage() {
   const handleSaveSizeStock = async (product: any) => {
     setSavingId(product.id)
     const updatedSizeStock = sizeStockMap[product.id] || {}
-
-    // Calculate total overall stock automatically from size quantities
     const computedTotalStock = Object.values(updatedSizeStock).reduce((acc, curr) => acc + Math.max(0, Number(curr) || 0), 0)
+    const updatedSizes = Array.isArray(product.sizes) && product.sizes.length > 0
+      ? Array.from(new Set([...product.sizes, ...Object.keys(updatedSizeStock)]))
+      : Object.keys(updatedSizeStock)
 
     try {
       const res = await fetch(`/api/admin/products/${product.id}`, {
@@ -80,6 +81,7 @@ export default function InventoryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...product,
+          sizes: updatedSizes,
           size_stock: updatedSizeStock,
           stock: computedTotalStock,
         }),

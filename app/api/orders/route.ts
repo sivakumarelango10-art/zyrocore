@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
         // Check overall stock
         if (product.stock < qty) {
           return NextResponse.json(
-            { error: `Insufficient stock for "${product.name}". Only ${product.stock} left.` },
+            { error: `Insufficient available stock for "${product.name}".` },
             { status: 400 }
           )
         }
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
           const availForSize = Math.max(0, Number(parsedSizeStock[item.size]) || 0)
           if (availForSize < qty) {
             return NextResponse.json(
-              { error: `Size ${item.size} of "${product.name}" is out of stock (only ${availForSize} available).` },
+              { error: `Only the available quantity can be added for size ${item.size} of "${product.name}".` },
               { status: 400 }
             )
           }

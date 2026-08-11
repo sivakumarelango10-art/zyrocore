@@ -27,6 +27,7 @@ interface CartItem {
   discount_price: number | null
   images: string[]
   stock: number
+  size_stock?: Record<string, number>
 }
 
 export default function CartPage() {
@@ -37,13 +38,17 @@ export default function CartPage() {
   const items: CartItem[] = data?.items ?? []
 
   const updateQty = async (id: number, quantity: number) => {
-    await fetch(`/api/cart/${id}`, {
+    const res = await fetch(`/api/cart/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ quantity }),
     })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(json.error || 'Could not update quantity')
+    }
     mutate()
     refreshCart()
   }
@@ -145,7 +150,11 @@ export default function CartPage() {
                             onClick={() => updateQty(item.id, item.quantity + 1)}
                             className="w-10 h-10 flex items-center justify-center hover:bg-muted active:scale-95 transition-all text-foreground"
                             aria-label="Increase quantity"
-                            disabled={item.quantity >= item.stock}
+                            disabled={
+                              item.quantity >= (item.size && item.size_stock?.[item.size] !== undefined
+                                ? Math.max(0, Number(item.size_stock[item.size]) || 0)
+                                : Math.max(0, Number(item.stock) || 0))
+                            }
                           >
                             <Plus className="w-4 h-4" />
                           </button>

@@ -594,30 +594,38 @@ export default function ProductDetailClient({ product, related }: Props) {
           )}
 
           {/* Quantity */}
-          <div className="mb-5">
-            <p className="text-sm font-medium mb-2">Quantity</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors"
-                aria-label="Decrease quantity"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <span className="w-10 text-center font-medium">{quantity}</span>
-              <button
-                onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
-                className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors"
-                aria-label="Increase quantity"
-                disabled={quantity >= product.stock}
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-semibold ml-2 text-foreground">
-                {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
-              </span>
-            </div>
-          </div>
+          {(() => {
+            const maxAvailableStock = selectedSize && product.size_stock?.[selectedSize] !== undefined
+              ? Math.max(0, Number(product.size_stock[selectedSize]) || 0)
+              : Math.max(0, Number(product.stock) || 0)
+
+            return (
+              <div className="mb-5">
+                <p className="text-sm font-medium mb-2">Quantity</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                    className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="w-10 text-center font-medium">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(q => Math.min(maxAvailableStock, q + 1))}
+                    className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                    aria-label="Increase quantity"
+                    disabled={quantity >= maxAvailableStock || maxAvailableStock === 0}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-semibold ml-2 text-foreground">
+                    {maxAvailableStock > 0 ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Dual Actions: Buy Now & Add to Cart (Desktop View) */}
           <div className="hidden md:flex gap-3 mb-6">

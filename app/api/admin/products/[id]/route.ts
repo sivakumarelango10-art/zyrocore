@@ -32,10 +32,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const description = typeof data.description === 'string' && data.description.trim() ? data.description.trim() : null
     const discount_price = data.discount_price !== null && data.discount_price !== undefined && !isNaN(parseFloat(data.discount_price)) ? parseFloat(data.discount_price) : null
     const category_id = data.category_id && !isNaN(parseInt(data.category_id)) ? parseInt(data.category_id) : null
-    const sizeStockObj = typeof data.size_stock === 'object' && data.size_stock !== null ? data.size_stock : {}
-    const stock = Object.values(sizeStockObj).reduce((acc: number, curr: any) => acc + Math.max(0, parseInt(curr) || 0), 0)
+    const rawSizeStock = typeof data.size_stock === 'object' && data.size_stock !== null ? data.size_stock : {}
+    const rawSizes = Array.isArray(data.sizes) ? data.sizes.filter((s: any) => typeof s === 'string' && s.trim()) : Object.keys(rawSizeStock)
+
+    const sizeStockObj: Record<string, number> = {}
+    const finalSizes: string[] = []
+
+    for (const s of rawSizes) {
+      const normalized = String(s).trim().toUpperCase()
+      if (normalized && !finalSizes.includes(normalized)) {
+        finalSizes.push(normalized)
+        sizeStockObj[normalized] = Math.max(0, parseInt(rawSizeStock[normalized] ?? rawSizeStock[s] ?? 0) || 0)
+      }
+    }
+
+    for (const [k, v] of Object.entries(rawSizeStock)) {
+      const normalized = String(k).trim().toUpperCase()
+      if (normalized && !finalSizes.includes(normalized)) {
+        finalSizes.push(normalized)
+        sizeStockObj[normalized] = Math.max(0, parseInt(v as any) || 0)
+      }
+    }
+
+    const stock = Object.values(sizeStockObj).reduce((acc: number, curr: number) => acc + curr, 0)
     const images = Array.isArray(data.images) ? data.images.filter((img: any) => typeof img === 'string' && img.trim()) : []
-    const sizes = Array.isArray(data.sizes) ? data.sizes.filter((s: any) => typeof s === 'string' && s.trim()) : []
 
     const productDetailsJson = JSON.stringify(typeof data.product_details === 'object' && data.product_details !== null ? data.product_details : {})
     const sizeStockJson = JSON.stringify(sizeStockObj)
@@ -53,7 +73,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         category_id = ${category_id},
         images = ${images},
         stock = ${stock},
-        sizes = ${sizes},
+        sizes = ${finalSizes},
         product_details = ${productDetailsJson}::jsonb,
         size_stock = ${sizeStockJson}::jsonb,
         is_featured = ${is_featured},

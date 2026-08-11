@@ -248,6 +248,16 @@ export default function ProductForm({ productId }: ProductFormProps) {
     fetch(`/api/products/${productId}`).then(r => r.ok ? r.json() : null).then(data => {
       const p = data?.product
       if (p) {
+        const dbSizeStock = (p.size_stock && typeof p.size_stock === 'object') ? p.size_stock : {}
+        const dbSizes = (Array.isArray(p.sizes) && p.sizes.length > 0)
+          ? Array.from(new Set([...p.sizes, ...Object.keys(dbSizeStock)]))
+          : Object.keys(dbSizeStock)
+
+        const initialSizeStock: Record<string, number> = {}
+        dbSizes.forEach((s: string) => {
+          initialSizeStock[s] = Math.max(0, Number(dbSizeStock[s]) || 0)
+        })
+
         setForm({
           name: p.name,
           description: p.description || '',
@@ -256,11 +266,12 @@ export default function ProductForm({ productId }: ProductFormProps) {
           category_id: p.category_id ? String(p.category_id) : '',
           stock: String(p.stock),
           images: p.images || [],
-          sizes: p.sizes || [],
+          sizes: dbSizes,
           is_featured: p.is_featured,
           is_best_seller: p.is_best_seller,
           show_on_home: p.show_on_home ?? false,
         })
+        setSizeStock(initialSizeStock)
 
         if (p.product_details) {
           const pd = p.product_details
@@ -287,10 +298,6 @@ export default function ProductForm({ productId }: ProductFormProps) {
             }
           })
           setCustomDetails(customs)
-        }
-
-        if (p.size_stock) {
-          setSizeStock(p.size_stock)
         }
       }
     }).finally(() => setLoading(false))

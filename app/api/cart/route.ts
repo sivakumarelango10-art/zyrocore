@@ -9,7 +9,7 @@ export async function GET() {
 
     const items = await sql`
       SELECT ci.*, 
-        p.id as product_id, p.name, p.price, p.discount_price, p.images, p.stock, p.sizes
+        p.id as product_id, p.name, p.price, p.discount_price, p.images, p.stock, p.sizes, p.size_stock
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       WHERE ci.user_id = ${user.id}
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
     if (!product_id) {
       return NextResponse.json({ error: 'product_id is required' }, { status: 400 })
     }
-    const qty = Number(quantity)
-    if (!qty || qty < 1) {
+    const qty = Math.floor(Number(quantity) || 0)
+    if (qty < 1) {
       return NextResponse.json({ error: 'quantity must be a positive number' }, { status: 400 })
     }
 
@@ -55,42 +55,48 @@ export async function POST(req: NextRequest) {
     }
 
     const product = products[0]
+    const sizeVal: string | null = typeof size === 'string' && size ? size.trim().toUpperCase() : null
 
     // 4. Validate size requirement
     const hasSizes = Array.isArray(product.sizes) && product.sizes.length > 0
-    if (hasSizes && !size) {
+    if (hasSizes && !sizeVal) {
       return NextResponse.json({ error: 'Please select a size' }, { status: 400 })
     }
 
-    // 5. Validate size-specific stock and overall stock
-    const sizeStockObj = (typeof product.size_stock === 'object' && product.size_stock !== null) ? product.size_stock : {}
-    if (size) {
-      const availableForSize = Math.max(0, Number(sizeStockObj[size as string]) || 0)
-      if (availableForSize === 0) {
-        return NextResponse.json({ error: `Size ${size} is out of stock.` }, { status: 400 })
-      }
-      if (availableForSize < qty) {
-        return NextResponse.json({ error: `Only ${availableForSize} item(s) available in size ${size}.` }, { status: 400 })
-      }
-    } else {
-      const overallStock = Number(product.stock) || 0
-      if (overallStock < qty) {
-        return NextResponse.json({ error: `Only ${overallStock} item(s) available in stock.` }, { status: 400 })
-      }
-    }
-
-    // 6. Upsert cart item
-    const sizeVal: string | null = typeof size === 'string' && size ? size : null
+    // Check existing quantity already in cart
     const existing = await sql`
       SELECT id, quantity FROM cart_items
       WHERE user_id = ${user.id}
         AND product_id = ${product_id as number}
         AND size IS NOT DISTINCT FROM ${sizeVal}
     `
+    const existingQty = existing.length > 0 ? Number(existing[0].quantity) || 0 : 0
+    const targetQty = existingQty + qty
 
+    // 5. Validate size-specific stock and overall stock
+    const sizeStockObj = (typeof product.size_stock === 'object' && product.size_stock !== null) ? product.size_stock : {}
+    if (sizeVal) {
+      const availableForSize = Math.max(0, Number(sizeStockObj[sizeVal]) || 0)
+      if (availableForSize === 0) {
+        return NextResponse.json({ error: `Size ${sizeVal} is currently out of stock.` }, { status: 400 })
+      }
+      if (targetQty > availableForSize) {
+        return NextResponse.json({ error: 'Only the available quantity can be added for this size.' }, { status: 400 })
+      }
+    } else {
+      const overallStock = Math.max(0, Number(product.stock) || 0)
+      if (overallStock === 0) {
+        return NextResponse.json({ error: 'This product is currently out of stock.' }, { status: 400 })
+      }
+      if (targetQty > overallStock) {
+        return NextResponse.json({ error: 'Only the available quantity can be added for this product.' }, { status: 400 })
+      }
+    }
+
+    // 6. Upsert cart item
     if (existing.length > 0) {
       await sql`
-        UPDATE cart_items SET quantity = quantity + ${qty}
+        UPDATE cart_items SET quantity = ${targetQty}
         WHERE id = ${existing[0].id}
       `
     } else {
