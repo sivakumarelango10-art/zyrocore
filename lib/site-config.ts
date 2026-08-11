@@ -1,8 +1,8 @@
 export const SITE_CONFIG = {
   name: 'ZYRØCORE',
   tagline: 'Built for Ambitious',
-  domain: 'zyrocore.in',
-  url: 'https://zyrocore.in',
+  domain: 'www.zyrocore.in',
+  url: 'https://www.zyrocore.in',
   supportEmail: 'bpzyrocore@gmail.com',
   emailPlaceholder: 'bpzyrocore@gmail.com',
   phone: '+91 63698 63301',

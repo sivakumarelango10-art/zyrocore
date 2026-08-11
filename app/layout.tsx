@@ -12,7 +12,11 @@ const InstagramFloat = dynamic(() => import('@/components/instagram-float'))
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://zyrocore.in'),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL
+      ? process.env.NEXT_PUBLIC_APP_URL.replace('://zyrocore.in', '://www.zyrocore.in')
+      : 'https://www.zyrocore.in'
+  ),
   title: 'ZYRØCORE — Built for Ambitious',
   description: 'Built for Ambitious. Discover premium clothing, activewear, and accessories at ZYRØCORE.',
   icons: {

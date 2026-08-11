@@ -4,7 +4,13 @@ import sql from '@/lib/db'
 export const revalidate = 3600 // Revalidate sitemap every hour
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zyrocore.in'
+  let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.zyrocore.in'
+
+  // Ensure www. is present for canonical domain consistency
+  if (baseUrl.includes('://zyrocore.in')) {
+    baseUrl = baseUrl.replace('://zyrocore.in', '://www.zyrocore.in')
+  }
+  baseUrl = baseUrl.replace(/\/$/, '')
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -16,6 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/shop`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/products`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
@@ -62,7 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const productRoutes: MetadataRoute.Sitemap = products.map((product) => ({
       url: `${baseUrl}/products/${product.id}`,
-      lastModified: product.updated_at || product.created_at || new Date(),
+      lastModified: product.updated_at ? new Date(product.updated_at) : product.created_at ? new Date(product.created_at) : new Date(),
       changeFrequency: 'weekly',
       priority: 0.8,
     }))

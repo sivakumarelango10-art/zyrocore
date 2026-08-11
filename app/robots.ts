@@ -1,7 +1,11 @@
 import type { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zyrocore.in'
+  let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.zyrocore.in'
+  if (baseUrl.includes('://zyrocore.in')) {
+    baseUrl = baseUrl.replace('://zyrocore.in', '://www.zyrocore.in')
+  }
+  baseUrl = baseUrl.replace(/\/$/, '')
 
   return {
     rules: {
