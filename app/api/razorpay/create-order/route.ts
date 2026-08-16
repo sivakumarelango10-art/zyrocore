@@ -68,14 +68,10 @@ export async function POST(req: NextRequest) {
 
     if (!razorpayRes.ok) {
       console.error('[razorpay/create-order] Error from Razorpay API:', rzpData)
-      let errorMsg =
+      const errorMsg =
         typeof rzpData.error === 'string'
           ? rzpData.error
           : rzpData.error?.description || 'Failed to create Razorpay order'
-
-      if (razorpayRes.status === 401 || errorMsg.toLowerCase().includes('authentication failed')) {
-        errorMsg = 'Razorpay API Key Authentication Failed: Invalid Key ID or Key Secret. Please configure your active Razorpay keys in Admin Console -> Payment Settings or in your .env file.'
-      }
 
       return NextResponse.json({ error: errorMsg }, { status: 400 })
     }
