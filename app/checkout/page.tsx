@@ -145,7 +145,7 @@ export default function CheckoutPage() {
   const [termsAccepted, setTermsAccepted] = useState(false)
 
   const subtotal = items.reduce((sum, item) => sum + (item.discount_price ?? item.price) * item.quantity, 0)
-  const shipping = subtotal >= 999 ? 0 : 99
+  const shipping = 0
   const total = subtotal + shipping
 
   const [locating, setLocating] = useState(false)
@@ -504,13 +504,8 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Delivery</span>
-                      <span className={shipping === 0 ? 'text-green-600 font-medium' : ''}>
-                        {shipping === 0 ? 'FREE' : formatPrice(shipping)}
-                      </span>
+                      <span className="text-emerald-500 font-semibold">FREE</span>
                     </div>
-                    {shipping > 0 && (
-                      <p className="text-xs text-muted-foreground">Free delivery on orders above {formatPrice(999)}</p>
-                    )}
                   </div>
                   <Separator className="mb-4" />
                   <div className="flex justify-between font-bold text-lg mb-5">

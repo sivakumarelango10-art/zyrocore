@@ -691,7 +691,7 @@ export default function ProductDetailClient({ product, related }: Props) {
           {/* Features */}
           <div className="border-t border-border pt-5 space-y-2">
             {[
-              { icon: Check, text: 'Free shipping on orders over ₹999' },
+              { icon: Check, text: 'Free shipping on all orders' },
               { icon: SITE_CONFIG.returnsEnabled ? Check : Info, text: SITE_CONFIG.returnsEnabled ? '15-day hassle-free returns' : 'Returns Currently Unavailable' },
               { icon: Check, text: 'Instant UPI Payment verification' },
             ].map(({ icon: Icon, text }) => (

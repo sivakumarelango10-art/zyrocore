@@ -194,7 +194,7 @@ export default function TermsAndConditionsClient() {
             </div>
             <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
               <p>
-                Orders are dispatched within 24–48 business hours. We offer <strong className="text-foreground">Free Shipping on orders over ₹999</strong> across India. Standard orders incur a ₹99 delivery fee.
+                Orders are dispatched within 24–48 business hours. We offer <strong className="text-foreground">Free Shipping on all orders</strong> across India.
               </p>
               <p>
                 Delivery timelines typically range between 3 to 7 business days depending on destination logistics.

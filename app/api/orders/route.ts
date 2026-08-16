@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const shippingCost = subtotal >= 999 ? 0 : 99
+    const shippingCost = 0
     const total = subtotal + shippingCost
     const method = payment_method || 'Razorpay'
 

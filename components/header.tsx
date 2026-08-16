@@ -213,7 +213,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-background border-b border-border">
       {/* Top bar */}
       <div className="bg-accent text-accent-foreground py-2 text-center text-xs font-medium tracking-widest uppercase">
-        Free shipping on orders over ₹999
+        Free shipping on all orders across India
       </div>
 
       {/* Main header */}

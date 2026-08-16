@@ -12,7 +12,7 @@ export default function BannerStrip() {
   }, [])
 
   const features = [
-    { icon: Truck, title: 'Free Shipping', desc: 'On orders over ₹999' },
+    { icon: Truck, title: 'Free Shipping', desc: 'On all orders across India' },
     {
       icon: SITE_CONFIG.returnsEnabled ? RotateCcw : Info,
       title: SITE_CONFIG.returnsEnabled ? 'Easy Returns' : 'No Returns',

@@ -66,7 +66,7 @@ export default function CartPage() {
     const price = item.discount_price ?? item.price
     return sum + price * item.quantity
   }, 0)
-  const shipping = subtotal >= 999 ? 0 : 99
+  const shipping = 0
   const total = subtotal + shipping
 
   if (!user) {
@@ -177,11 +177,8 @@ export default function CartPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Shipping</span>
-                      <span>{shipping === 0 ? 'Free' : formatPrice(shipping)}</span>
+                      <span className="font-semibold text-emerald-500">Free</span>
                     </div>
-                    {shipping > 0 && (
-                      <p className="text-xs text-muted-foreground">Add {formatPrice(999 - subtotal)} more for free shipping</p>
-                    )}
                   </div>
                   <Separator className="my-4" />
                   <div className="flex justify-between font-bold text-lg mb-5">
