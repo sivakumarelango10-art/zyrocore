@@ -20,7 +20,6 @@ const NAV = [
   { href: '/secure-admin/inventory',  label: 'Inventory',   icon: Layers,          exact: false },
   { href: '/secure-admin/analytics',  label: 'Analytics',   icon: BarChart2,       exact: false },
   { href: '/secure-admin/reports',    label: 'Reports',     icon: FileText,        exact: false },
-  { href: '/secure-admin/payment-settings', label: 'Payments', icon: QrCode,        exact: false },
   { href: '/secure-admin/profile',    label: 'Profile',     icon: User,            exact: false },
 ]
 

@@ -20,12 +20,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required Razorpay payment details' }, { status: 400 })
     }
 
-    const settings = await sql`SELECT razorpay_key_secret FROM payment_settings ORDER BY id DESC LIMIT 1`.catch(() => [])
-    const dbKeySecret = settings?.[0]?.razorpay_key_secret
-    const keySecret = dbKeySecret || process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || env.RAZORPAY_KEY_SECRET
 
     if (!keySecret) {
-      return NextResponse.json({ error: 'Razorpay Key Secret is not configured' }, { status: 500 })
+      return NextResponse.json({ error: 'Razorpay Key Secret is not configured in environment variables' }, { status: 500 })
     }
 
     // 1. Timing-safe HMAC SHA-256 Signature Verification

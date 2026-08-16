@@ -32,17 +32,12 @@ export async function POST(req: NextRequest) {
     const order = orders[0]
     const amountInPaise = Math.round(Number(order.total) * 100)
 
-    // DB payment settings first (only if both key ID and secret are present), fallback to env variables
-    const settings = await sql`SELECT razorpay_key_id, razorpay_key_secret FROM payment_settings WHERE is_active = true ORDER BY id DESC LIMIT 1`.catch(() => [])
-    const dbKeyId = settings?.[0]?.razorpay_key_id?.trim()
-    const dbKeySecret = settings?.[0]?.razorpay_key_secret?.trim()
-
-    const useDbKeys = Boolean(dbKeyId && dbKeySecret)
-    const keyId = useDbKeys ? dbKeyId! : (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || process.env.RAZORPAY_KEY_ID?.trim() || env.RAZORPAY_KEY_ID)
-    const keySecret = useDbKeys ? dbKeySecret! : (process.env.RAZORPAY_KEY_SECRET?.trim() || env.RAZORPAY_KEY_SECRET)
+    // Read Razorpay API credentials directly from environment variables (.env)
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || process.env.RAZORPAY_KEY_ID?.trim() || env.RAZORPAY_KEY_ID
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || env.RAZORPAY_KEY_SECRET
 
     if (!keyId || !keySecret) {
-      return NextResponse.json({ error: 'Razorpay API keys are not configured' }, { status: 500 })
+      return NextResponse.json({ error: 'Razorpay API keys are not configured in environment variables' }, { status: 500 })
     }
 
     const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
