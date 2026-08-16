@@ -284,7 +284,13 @@ export default function ProductForm({ productId }: ProductFormProps) {
       fetch(`/api/products/${productId}`).then(r => r.ok ? r.json() : null).then(data => {
         const p = data?.product
         if (p) {
-          const dbSizeStock = (p.size_stock && typeof p.size_stock === 'object') ? p.size_stock : {}
+          let dbSizeStock: Record<string, number> = {}
+          if (typeof p.size_stock === 'object' && p.size_stock !== null) {
+            dbSizeStock = p.size_stock
+          } else if (typeof p.size_stock === 'string') {
+            try { dbSizeStock = JSON.parse(p.size_stock) } catch {}
+          }
+
           const dbSizes = (Array.isArray(p.sizes) && p.sizes.length > 0)
             ? Array.from(new Set([...p.sizes, ...Object.keys(dbSizeStock)]))
             : Object.keys(dbSizeStock)

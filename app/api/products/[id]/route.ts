@@ -18,7 +18,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (products.length === 0) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
-    return NextResponse.json({ product: products[0] })
+    const product = products[0]
+    if (typeof product.size_stock === 'string') {
+      try {
+        product.size_stock = JSON.parse(product.size_stock)
+      } catch {
+        product.size_stock = {}
+      }
+    }
+    return NextResponse.json({ product })
   } catch (error) {
     console.error('Product GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
