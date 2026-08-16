@@ -3,25 +3,28 @@ import bcrypt from 'bcryptjs'
 import fs from 'fs'
 import path from 'path'
 
-// Programmatically parse .env.local if it exists (local development fallback)
-const envLocalPath = path.join(process.cwd(), '.env.local')
-if (fs.existsSync(envLocalPath)) {
-  const envContent = fs.readFileSync(envLocalPath, 'utf8')
-  envContent.split(/\r?\n/).forEach(line => {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) return
-    const firstEquals = trimmed.indexOf('=')
-    if (firstEquals === -1) return
-    const key = trimmed.substring(0, firstEquals).trim()
-    let val = trimmed.substring(firstEquals + 1).trim()
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.substring(1, val.length - 1)
-    }
-    if (!process.env[key]) {
-      process.env[key] = val
-    }
-  })
+// Programmatically parse .env and .env.local if they exist
+const loadEnvFile = (filePath) => {
+  if (fs.existsSync(filePath)) {
+    const envContent = fs.readFileSync(filePath, 'utf8')
+    envContent.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) return
+      const firstEquals = trimmed.indexOf('=')
+      if (firstEquals === -1) return
+      const key = trimmed.substring(0, firstEquals).trim()
+      let val = trimmed.substring(firstEquals + 1).trim()
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.substring(1, val.length - 1)
+      }
+      if (!process.env[key]) {
+        process.env[key] = val
+      }
+    })
+  }
 }
+loadEnvFile(path.join(process.cwd(), '.env'))
+loadEnvFile(path.join(process.cwd(), '.env.local'))
 
 const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || ''
 if (!dbUrl) {
