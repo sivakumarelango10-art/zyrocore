@@ -12,10 +12,13 @@ dist/
 # Environment variables — NEVER commit these
 .env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
-.env.production.local
 .env.production
+.env.production.local
+.env*.local
 
 # Debug logs
 npm-debug.log*
