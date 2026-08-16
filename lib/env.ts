@@ -7,14 +7,23 @@
 
 const isServer = typeof window === 'undefined'
 
+function cleanEnv(val: string | undefined): string {
+  if (!val) return ''
+  let s = val.trim()
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.substring(1, s.length - 1).trim()
+  }
+  return s
+}
+
 // Public client-safe environment variables
 export const clientEnv = {
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
-  NEXT_PUBLIC_RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-  NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || '',
+  get NEXT_PUBLIC_SUPABASE_URL() { return cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL) },
+  get NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY() { return cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) },
+  get NEXT_PUBLIC_APP_URL() { return cleanEnv(process.env.NEXT_PUBLIC_APP_URL) },
+  get NEXT_PUBLIC_RAZORPAY_KEY_ID() { return cleanEnv(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) },
+  get NEXT_PUBLIC_GOOGLE_MAPS_API_KEY() { return cleanEnv(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) },
+  get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() { return cleanEnv(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION) },
 }
 
 // Strictly server-side secret environment variables

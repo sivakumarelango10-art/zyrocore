@@ -32,13 +32,25 @@ export async function POST(req: NextRequest) {
     const order = orders[0]
     const amountInPaise = Math.round(Number(order.total) * 100)
 
-    // Read Razorpay API credentials directly from environment variables (.env)
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || process.env.RAZORPAY_KEY_ID?.trim() || env.RAZORPAY_KEY_ID
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || env.RAZORPAY_KEY_SECRET
+    // Read Razorpay API credentials directly from environment variables (.env / Vercel env)
+    const clean = (val?: string) => {
+      if (!val) return ''
+      let s = val.trim()
+      if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+        s = s.substring(1, s.length - 1).trim()
+      }
+      return s
+    }
+
+    const keyId = clean(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID)
+    const keySecret = clean(process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET)
 
     if (!keyId || !keySecret) {
+      console.error('[razorpay/create-order] Missing API keys. Key ID configured?:', Boolean(keyId), 'Key Secret configured?:', Boolean(keySecret))
       return NextResponse.json({ error: 'Razorpay API keys are not configured in environment variables' }, { status: 500 })
     }
+
+    console.log('[razorpay/create-order] Creating order with Key ID:', `${keyId.substring(0, 10)}...${keyId.substring(keyId.length - 4)}`, 'Secret length:', keySecret.length)
 
     const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
 
