@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
     const order = orders[0]
     const amountInPaise = Math.round(Number(order.total) * 100)
 
-    // DB payment settings first, fallback to env variables
-    const settings = await sql`SELECT razorpay_key_id, razorpay_key_secret FROM payment_settings ORDER BY id DESC LIMIT 1`.catch(() => [])
-    const dbKeyId = settings?.[0]?.razorpay_key_id
-    const dbKeySecret = settings?.[0]?.razorpay_key_secret
+    // DB payment settings first (only if both key ID and secret are present), fallback to env variables
+    const settings = await sql`SELECT razorpay_key_id, razorpay_key_secret FROM payment_settings WHERE is_active = true ORDER BY id DESC LIMIT 1`.catch(() => [])
+    const dbKeyId = settings?.[0]?.razorpay_key_id?.trim()
+    const dbKeySecret = settings?.[0]?.razorpay_key_secret?.trim()
 
-    const keyId = dbKeyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID
-    const keySecret = dbKeySecret || process.env.RAZORPAY_KEY_SECRET || env.RAZORPAY_KEY_SECRET
+    const useDbKeys = Boolean(dbKeyId && dbKeySecret)
+    const keyId = useDbKeys ? dbKeyId! : (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || process.env.RAZORPAY_KEY_ID?.trim() || env.RAZORPAY_KEY_ID)
+    const keySecret = useDbKeys ? dbKeySecret! : (process.env.RAZORPAY_KEY_SECRET?.trim() || env.RAZORPAY_KEY_SECRET)
 
     if (!keyId || !keySecret) {
       return NextResponse.json({ error: 'Razorpay API keys are not configured' }, { status: 500 })
@@ -67,10 +68,15 @@ export async function POST(req: NextRequest) {
 
     if (!razorpayRes.ok) {
       console.error('[razorpay/create-order] Error from Razorpay API:', rzpData)
-      const errorMsg =
+      let errorMsg =
         typeof rzpData.error === 'string'
           ? rzpData.error
           : rzpData.error?.description || 'Failed to create Razorpay order'
+
+      if (razorpayRes.status === 401 || errorMsg.toLowerCase().includes('authentication failed')) {
+        errorMsg = 'Razorpay API Key Authentication Failed: Invalid Key ID or Key Secret. Please configure your active Razorpay keys in Admin Console -> Payment Settings or in your .env file.'
+      }
+
       return NextResponse.json({ error: errorMsg }, { status: 400 })
     }
 

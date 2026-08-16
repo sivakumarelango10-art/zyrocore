@@ -44,7 +44,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
     price: '',
     discount_price: '',
     category_id: '',
-    stock: isEdit ? '' : '0',
+    stock: isEdit ? '' : '50',
     images: [] as string[],
     sizes: isEdit ? [] : ['S', 'M', 'L', 'XL', 'XXL'],
     is_featured: false,
@@ -53,7 +53,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
   })
 
   const [sizeStock, setSizeStock] = useState<Record<string, number>>(
-    isEdit ? {} : { S: 0, M: 0, L: 0, XL: 0, XXL: 0 }
+    isEdit ? {} : { S: 10, M: 10, L: 10, XL: 10, XXL: 10 }
   )
 
   const [stagedImages, setStagedImages] = useState<StagedImageItem[]>([])
@@ -342,7 +342,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
     if (s && !form.sizes.includes(s)) {
       const newSizes = [...form.sizes, s]
       set('sizes', newSizes)
-      const newStock = { ...sizeStock, [s]: sizeStock[s] ?? 0 }
+      const newStock = { ...sizeStock, [s]: sizeStock[s] ?? 10 }
       setSizeStock(newStock)
 
       // Auto-calculate total stock
