@@ -78,10 +78,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    // Auto-transform status to 'shipped' when tracking details are entered (unless explicitly set or already delivered/cancelled)
+    let nextStatus: string | null = status || null
+    const hasTrackingData = (tracking_number !== undefined && tracking_number !== null && tracking_number !== '') ||
+                            (courier_name !== undefined && courier_name !== null && courier_name !== '') ||
+                            (cleanTrackingUrl !== undefined && cleanTrackingUrl !== null)
+
+    if (!nextStatus && hasTrackingData) {
+      const existing = await sql`SELECT status FROM orders WHERE id = ${orderIdNum} LIMIT 1`
+      if (existing.length > 0 && existing[0].status !== 'delivered' && existing[0].status !== 'cancelled') {
+        nextStatus = 'shipped'
+      }
+    }
+
     const updated = await sql`
       UPDATE orders
       SET
-        status = COALESCE(${status || null}, status),
+        status = COALESCE(${nextStatus}, status),
         tracking_number = ${tracking_number !== undefined ? (tracking_number || null) : sql`tracking_number`},
         courier_name = ${courier_name !== undefined ? (courier_name || null) : sql`courier_name`},
         tracking_url = ${cleanTrackingUrl !== undefined ? cleanTrackingUrl : sql`tracking_url`},

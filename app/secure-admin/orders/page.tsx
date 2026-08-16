@@ -185,6 +185,11 @@ export default function AdminOrdersPage() {
   const handleSaveTracking = async () => {
     if (!fullOrder) return
     setUpdatingId(fullOrder.id)
+
+    // Auto-transform order status to 'shipped' if tracking details are entered and order is not delivered/cancelled
+    const autoShip = fullOrder.status !== 'delivered' && fullOrder.status !== 'cancelled'
+    const targetStatus: OrderStatus = autoShip ? 'shipped' : fullOrder.status
+
     const res = await fetch(`/api/admin/orders/${fullOrder.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -192,16 +197,34 @@ export default function AdminOrdersPage() {
         courier_name: courierInput.trim() || null,
         tracking_number: trackingInput.trim() || null,
         tracking_url: trackingUrlInput.trim() || null,
+        status: targetStatus,
       }),
     })
 
     const resData = await res.json().catch(() => ({}))
 
     if (res.ok) {
-      toast.success(`Tracking details saved for Order #${fullOrder.id}`)
+      const finalStatus = (resData.order?.status as OrderStatus) || targetStatus
+      toast.success(
+        finalStatus === 'shipped'
+          ? `Tracking details saved & Order #${fullOrder.id} status updated to SHIPPED!`
+          : `Tracking details saved for Order #${fullOrder.id}`
+      )
       const updatedUrl = resData.order?.tracking_url ?? (trackingUrlInput.trim() || null)
-      setOrders(prev => prev.map(o => o.id === fullOrder.id ? { ...o, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null, tracking_url: updatedUrl } : o))
-      setFullOrder(prev => prev ? { ...prev, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null, tracking_url: updatedUrl } : null)
+      setOrders(prev => prev.map(o => o.id === fullOrder.id ? {
+        ...o,
+        courier_name: courierInput.trim() || null,
+        tracking_number: trackingInput.trim() || null,
+        tracking_url: updatedUrl,
+        status: finalStatus,
+      } : o))
+      setFullOrder(prev => prev ? {
+        ...prev,
+        courier_name: courierInput.trim() || null,
+        tracking_number: trackingInput.trim() || null,
+        tracking_url: updatedUrl,
+        status: finalStatus,
+      } : null)
     } else {
       toast.error(resData.error || 'Failed to save tracking details')
     }
