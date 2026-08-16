@@ -68,10 +68,14 @@ export async function POST(req: NextRequest) {
 
     if (!razorpayRes.ok) {
       console.error('[razorpay/create-order] Error from Razorpay API:', rzpData)
-      const errorMsg =
+      let errorMsg =
         typeof rzpData.error === 'string'
           ? rzpData.error
           : rzpData.error?.description || 'Failed to create Razorpay order'
+
+      if (razorpayRes.status === 401 || errorMsg.toLowerCase().includes('authentication failed')) {
+        errorMsg = 'Razorpay Authentication Failed: The API key pair in .env (or Payment Settings) is invalid or expired on Razorpay. Please update NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env with active keys from https://dashboard.razorpay.com'
+      }
 
       return NextResponse.json({ error: errorMsg }, { status: 400 })
     }
