@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/components/auth-provider'
 import { CartProvider } from '@/components/cart-provider'
+import { ThemeProvider } from '@/components/theme-provider'
+import { RealtimeProvider } from '@/components/realtime-provider'
 import dynamic from 'next/dynamic'
 import './globals.css'
 
@@ -120,16 +123,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  let supabaseOrigin: string | null = null
+  try {
+    if (supabaseUrl) supabaseOrigin = new URL(supabaseUrl).origin
+  } catch {
+    // Ignore invalid url
+  }
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fdtituksbcprvduaskii.supabase.co" crossOrigin="anonymous" />
+        {supabaseOrigin && (
+          <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+        )}
         <link
           rel="preload"
           as="image"
           href="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/product2-MrjpbiVDhc1Nnt7rEHuFQpWG0mjnmu.png"
-          // @ts-ignore fetchpriority is valid HTML attribute
-          fetchpriority="high"
+          fetchPriority="high"
         />
         <script
           type="application/ld+json"
@@ -143,14 +155,19 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <AuthProvider>
-          <CartProvider>
-            {children}
-            <InstagramFloat />
-            <Toaster position="bottom-right" />
-          </CartProvider>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <AuthProvider>
+            <RealtimeProvider>
+              <CartProvider>
+                {children}
+                <InstagramFloat />
+                <Toaster position="bottom-right" />
+              </CartProvider>
+            </RealtimeProvider>
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

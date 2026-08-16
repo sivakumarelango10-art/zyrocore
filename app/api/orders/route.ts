@@ -12,27 +12,31 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20))
     const offset = (page - 1) * limit
 
-    const orders = await sql`
-      SELECT o.*, 
-        json_agg(
-          json_build_object(
-            'id', oi.id,
-            'product_name', oi.product_name,
-            'product_image', oi.product_image,
-            'price', oi.price,
-            'quantity', oi.quantity,
-            'size', oi.size
-          )
-        ) as items
-      FROM orders o
-      LEFT JOIN order_items oi ON o.id = oi.order_id
-      WHERE o.user_id = ${user.id}
-      GROUP BY o.id
-      ORDER BY o.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
+    const [orders, countRes] = await Promise.all([
+      sql`
+        SELECT o.*, 
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', oi.id,
+                'product_name', oi.product_name,
+                'product_image', oi.product_image,
+                'price', oi.price,
+                'quantity', oi.quantity,
+                'size', oi.size
+              )
+            ) FILTER (WHERE oi.id IS NOT NULL), '[]'
+          ) as items
+        FROM orders o
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        WHERE o.user_id = ${user.id}
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+      sql`SELECT COUNT(*)::int AS count FROM orders WHERE user_id = ${user.id}`,
+    ])
 
-    const countRes = await sql`SELECT COUNT(*) FROM orders WHERE user_id = ${user.id}`
     const total = parseInt(countRes[0]?.count || '0')
 
     return NextResponse.json({

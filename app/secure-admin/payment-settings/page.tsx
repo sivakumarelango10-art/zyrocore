@@ -177,7 +177,7 @@ export default function AdminPaymentSettingsPage() {
                         type={showSecret ? 'text' : 'password'}
                         value={razorpayKeySecret}
                         onChange={e => setRazorpayKeySecret(e.target.value)}
-                        placeholder="Enter key secret"
+                        placeholder={data?.settings?.has_razorpay_secret ? '•••••••••••••••• (Configured)' : 'Enter key secret'}
                         className="w-full px-3.5 py-2.5 pr-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
                       />
                       <button
@@ -188,7 +188,11 @@ export default function AdminPaymentSettingsPage() {
                         {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-[11px] text-neutral-400 mt-1">Kept confidential on the server</p>
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      {data?.settings?.has_razorpay_secret
+                        ? 'Secret is securely configured. Leave empty to keep existing secret unchanged.'
+                        : 'Kept confidential on the server'}
+                    </p>
                   </div>
                 </div>
               </div>

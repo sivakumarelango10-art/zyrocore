@@ -9,6 +9,8 @@ import {
 import { Download, TrendingUp, DollarSign, ShoppingBag, Users, Award } from 'lucide-react'
 import { toast } from 'sonner'
 
+import GeminiSalesAnalysis from '@/components/admin/gemini-sales-analysis'
+
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 }
@@ -84,6 +86,9 @@ export default function ReportsPage() {
             Export CSV Report
           </button>
         </div>
+
+        {/* Gemini AI Sales Intelligence */}
+        <GeminiSalesAnalysis />
 
         {loading ? (
           <div className="py-20 text-center text-neutral-400 text-sm font-medium">Generating performance reports...</div>

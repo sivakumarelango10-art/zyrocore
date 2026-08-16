@@ -53,7 +53,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json().catch(() => ({}))
-    const { status, tracking_number, courier_name } = body
+    const { status, tracking_number, courier_name, tracking_url } = body
+
+    let cleanTrackingUrl: string | null | undefined = undefined
+    if (tracking_url !== undefined) {
+      if (tracking_url === null || tracking_url === '') {
+        cleanTrackingUrl = null
+      } else if (typeof tracking_url === 'string') {
+        let trimmedUrl = tracking_url.trim()
+        if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+          trimmedUrl = `https://${trimmedUrl}`
+        }
+        try {
+          const parsed = new URL(trimmedUrl)
+          if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return NextResponse.json({ error: 'Tracking URL must use a safe http/https protocol.' }, { status: 400 })
+          }
+          cleanTrackingUrl = parsed.toString()
+        } catch {
+          return NextResponse.json({ error: 'Invalid tracking URL format.' }, { status: 400 })
+        }
+      } else {
+        return NextResponse.json({ error: 'Invalid tracking URL format.' }, { status: 400 })
+      }
+    }
 
     const updated = await sql`
       UPDATE orders
@@ -61,6 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         status = COALESCE(${status || null}, status),
         tracking_number = ${tracking_number !== undefined ? (tracking_number || null) : sql`tracking_number`},
         courier_name = ${courier_name !== undefined ? (courier_name || null) : sql`courier_name`},
+        tracking_url = ${cleanTrackingUrl !== undefined ? cleanTrackingUrl : sql`tracking_url`},
         updated_at = NOW()
       WHERE id = ${orderIdNum}
       RETURNING *

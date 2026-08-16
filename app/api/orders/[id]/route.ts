@@ -14,16 +14,54 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     const orders = user.role === 'admin'
-      ? await sql`SELECT o.* FROM orders o WHERE o.id = ${orderIdNum}`
-      : await sql`SELECT o.* FROM orders o WHERE o.id = ${orderIdNum} AND o.user_id = ${user.id}`
+      ? await sql`
+          SELECT o.*,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', oi.id,
+                  'product_id', oi.product_id,
+                  'product_name', oi.product_name,
+                  'product_image', oi.product_image,
+                  'price', oi.price,
+                  'quantity', oi.quantity,
+                  'size', oi.size
+                )
+              ) FILTER (WHERE oi.id IS NOT NULL), '[]'
+            ) as items
+          FROM orders o
+          LEFT JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.id = ${orderIdNum}
+          GROUP BY o.id
+        `
+      : await sql`
+          SELECT o.*,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', oi.id,
+                  'product_id', oi.product_id,
+                  'product_name', oi.product_name,
+                  'product_image', oi.product_image,
+                  'price', oi.price,
+                  'quantity', oi.quantity,
+                  'size', oi.size
+                )
+              ) FILTER (WHERE oi.id IS NOT NULL), '[]'
+            ) as items
+          FROM orders o
+          LEFT JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.id = ${orderIdNum} AND o.user_id = ${user.id}
+          GROUP BY o.id
+        `
+
     if (orders.length === 0) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const items = await sql`SELECT * FROM order_items WHERE order_id = ${orderIdNum}`
-
-    return NextResponse.json({ order: { ...orders[0], items } })
+    return NextResponse.json({ order: orders[0] })
   } catch (error) {
+    console.error('[orders/[id] GET] error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

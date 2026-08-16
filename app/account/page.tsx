@@ -36,7 +36,9 @@ export default function AccountPage() {
     city: '',
     state: '',
     zip: '',
+    currentPassword: '',
     newPassword: '',
+    confirmPassword: '',
   })
 
   // Sync state when user is loaded or updated
@@ -49,7 +51,9 @@ export default function AccountPage() {
         city: user.city || '',
         state: user.state || '',
         zip: user.zip || '',
+        currentPassword: '',
         newPassword: '',
+        confirmPassword: '',
       })
       if (user.zip && user.zip.length === 6 && (!user.city || !user.state)) {
         fetchAddressByPincode(user.zip).then(geo => {
@@ -121,12 +125,40 @@ export default function AccountPage() {
       return
     }
 
+    if (formData.newPassword.trim()) {
+      if (!formData.currentPassword.trim()) {
+        toast.error('Current password is required to change password')
+        return
+      }
+      if (formData.newPassword.trim().length < 8) {
+        toast.error('New password must be at least 8 characters long')
+        return
+      }
+      if (formData.newPassword.trim() !== formData.confirmPassword.trim()) {
+        toast.error('New password and confirm password do not match')
+        return
+      }
+      if (formData.currentPassword.trim() === formData.newPassword.trim()) {
+        toast.error('New password must be different from current password')
+        return
+      }
+    }
+
     setSaving(true)
     try {
       const res = await fetch('/api/account/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          zip: formData.zip.trim(),
+          currentPassword: formData.currentPassword.trim() || undefined,
+          newPassword: formData.newPassword.trim() || undefined,
+        }),
       })
 
       const data = await safeParseJson(res)
@@ -134,6 +166,12 @@ export default function AccountPage() {
 
       await refreshUser()
       toast.success('Personal details updated successfully')
+      setFormData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }))
       setIsEditing(false)
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong')
@@ -305,17 +343,58 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-border">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5" /> Change Password (Optional)
-                  </label>
-                  <Input
-                    type="password"
-                    value={formData.newPassword}
-                    onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
-                    placeholder="Leave blank to keep current password"
-                    minLength={6}
-                  />
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" /> Change Password (Optional)
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mb-2">Leave blank if you do not want to change your password.</p>
+                  </div>
+
+                  <div className="space-y-3 bg-muted/20 p-3.5 rounded-xl border border-border/50">
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-1">
+                        Current Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={formData.currentPassword}
+                        onChange={e => setFormData({ ...formData, currentPassword: e.target.value })}
+                        placeholder="Enter your current password"
+                        autoComplete="current-password"
+                      />
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-1">
+                          New Password (Min 8 chars)
+                        </label>
+                        <Input
+                          type="password"
+                          value={formData.newPassword}
+                          onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
+                          placeholder="Enter new password"
+                          autoComplete="new-password"
+                          minLength={8}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-1">
+                          Confirm New Password
+                        </label>
+                        <Input
+                          type="password"
+                          value={formData.confirmPassword}
+                          onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                          placeholder="Re-enter new password"
+                          autoComplete="new-password"
+                          minLength={8}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">

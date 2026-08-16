@@ -20,6 +20,7 @@ import {
 import dynamic from 'next/dynamic'
 import ProductCard from '@/components/product-card'
 import { formatPrice, formatDate, calculateDiscount, safeParseJson } from '@/lib/utils-shop'
+import { getAvailableStockForSize } from '@/lib/inventory-utils'
 
 const ProductLightbox = dynamic(() => import('@/components/product-lightbox'), { ssr: false })
 import { useAuth } from '@/components/auth-provider'
@@ -546,58 +547,59 @@ export default function ProductDetailClient({ product, related }: Props) {
           )}
 
           {/* Sizes */}
-          {product.sizes?.length > 0 && (
-            <div className="mb-5 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Select Size {selectedSize && <span className="text-muted-foreground font-bold">— {selectedSize}</span>}</p>
-                {selectedSize && product.size_stock?.[selectedSize] !== undefined && (
-                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-md ${
-                    product.size_stock[selectedSize] === 0
-                      ? 'bg-red-100 text-red-700 border border-red-200'
-                      : product.size_stock[selectedSize] <= 3
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : 'bg-green-100 text-green-800 border border-green-200'
-                  }`}>
-                    {product.size_stock[selectedSize] === 0
-                      ? 'Out of Stock'
-                      : product.size_stock[selectedSize] <= 3
-                      ? 'Low Stock'
-                      : 'In Stock'}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {product.sizes.map(size => {
-                  const sizeQty = product.size_stock?.[size]
-                  const isOutOfStock = sizeQty === 0
+          {(() => {
+            const liveProduct: Product = (typeof window !== 'undefined' && (product as any))
+            const liveSizes = liveProduct?.sizes?.length ? liveProduct.sizes : product.sizes || []
+            const liveSizeStock = liveProduct?.size_stock || product.size_stock || {}
 
-                  return (
-                    <button
-                      key={size}
-                      disabled={isOutOfStock}
-                      onClick={() => setSelectedSize(size)}
-                      className={`relative min-w-[3rem] h-10 px-3 text-sm rounded-xl border transition-all font-medium flex items-center justify-center gap-1 ${
-                        isOutOfStock
-                          ? 'border-border/40 text-muted-foreground/40 bg-muted/20 cursor-not-allowed line-through'
-                          : selectedSize === size
-                          ? 'bg-foreground text-background border-foreground shadow-md font-bold'
-                          : 'border-border text-foreground hover:border-foreground/50 bg-background'
-                      }`}
-                    >
-                      <span>{size}</span>
-                      {isOutOfStock && <span className="text-[9px] uppercase font-bold text-red-500 no-underline">OOS</span>}
-                    </button>
-                  )
-                })}
+            return liveSizes.length > 0 ? (
+              <div className="mb-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Select Size {selectedSize && <span className="text-muted-foreground font-bold">— {selectedSize}</span>}</p>
+                  {selectedSize && (
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-md ${
+                      getAvailableStockForSize(product.stock, liveSizeStock, selectedSize) === 0
+                        ? 'bg-red-100 text-red-700 border border-red-200'
+                        : 'bg-green-100 text-green-800 border border-green-200'
+                    }`}>
+                      {getAvailableStockForSize(product.stock, liveSizeStock, selectedSize) === 0
+                        ? 'Out of Stock'
+                        : 'Available'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {liveSizes.map(size => {
+                    const avail = getAvailableStockForSize(product.stock, liveSizeStock, size)
+                    const isOutOfStock = avail <= 0
+
+                    return (
+                      <button
+                        key={size}
+                        disabled={isOutOfStock}
+                        onClick={() => setSelectedSize(size)}
+                        className={`relative min-w-[3rem] h-10 px-3 text-sm rounded-xl border transition-all font-medium flex items-center justify-center gap-1 ${
+                          isOutOfStock
+                            ? 'border-border/40 text-muted-foreground/40 bg-muted/20 cursor-not-allowed line-through'
+                            : selectedSize === size
+                            ? 'bg-foreground text-background border-foreground shadow-md font-bold'
+                            : 'border-border text-foreground hover:border-foreground/50 bg-background'
+                        }`}
+                      >
+                        <span className="font-bold">{size}</span>
+                        {isOutOfStock && <span className="text-[9px] uppercase font-bold text-red-500 no-underline">OOS</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null
+          })()}
 
           {/* Quantity */}
           {(() => {
-            const maxAvailableStock = selectedSize && product.size_stock?.[selectedSize] !== undefined
-              ? Math.max(0, Number(product.size_stock[selectedSize]) || 0)
-              : Math.max(0, Number(product.stock) || 0)
+            const liveSizeStock = product.size_stock || {}
+            const maxAvailableStock = getAvailableStockForSize(product.stock, liveSizeStock, selectedSize)
 
             return (
               <div className="mb-5">
@@ -894,11 +896,11 @@ export default function ProductDetailClient({ product, related }: Props) {
                   <div className="flex gap-2 mt-3">
                     {reviewImages.map((imgUrl, i) => (
                       <div key={i} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border group">
-                        <img src={imgUrl} alt="Review attachment" className="w-full h-full object-cover" />
+                        <Image src={imgUrl} alt="Review attachment" fill sizes="56px" unoptimized className="object-cover" />
                         <button
                           type="button"
                           onClick={() => setReviewImages(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                         >
                           ✕
                         </button>
@@ -972,7 +974,7 @@ export default function ProductDetailClient({ product, related }: Props) {
                   <div className="flex gap-2 pt-2">
                     {rev.images.map((img, i) => (
                       <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border">
-                        <img src={img} alt="Customer attachment" className="w-full h-full object-cover" />
+                        <Image src={img} alt="Customer attachment" fill sizes="64px" unoptimized className="object-cover" />
                       </div>
                     ))}
                   </div>

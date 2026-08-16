@@ -2,27 +2,13 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import sql from '@/lib/db'
 import bcrypt from 'bcryptjs'
-
-// Ensure user columns exist safely on database
-async function ensureUserColumns() {
-  try {
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)`
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT`
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100)`
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100)`
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS zip VARCHAR(20)`
-  } catch (err) {
-    console.error('[ensureUserColumns] Warning:', err)
-  }
-}
+import { cookies } from 'next/headers'
 
 export async function GET() {
   const sessionUser = await getSession()
   if (!sessionUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  await ensureUserColumns()
 
   const rows = await sql`
     SELECT id, name, email, role, phone, address, city, state, zip, created_at
@@ -43,8 +29,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  await ensureUserColumns()
-
   try {
     let body: any = {}
     try {
@@ -56,17 +40,45 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Invalid JSON request payload' }, { status: 400 })
     }
 
-    const { name, phone, address, city, state, zip, newPassword } = body
+    const { name, phone, address, city, state, zip, currentPassword, newPassword } = body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
     let passwordHash: string | null = null
+
     if (newPassword && typeof newPassword === 'string' && newPassword.trim().length > 0) {
-      if (newPassword.trim().length < 6) {
-        return NextResponse.json({ error: 'New password must be at least 6 characters' }, { status: 400 })
+      if (!currentPassword || typeof currentPassword !== 'string' || !currentPassword.trim()) {
+        return NextResponse.json({ error: 'Current password is required' }, { status: 400 })
       }
+
+      if (newPassword.trim().length < 8) {
+        return NextResponse.json({ error: 'New password must be at least 8 characters long' }, { status: 400 })
+      }
+
+      if (currentPassword === newPassword.trim()) {
+        return NextResponse.json({ error: 'New password must be different from current password' }, { status: 400 })
+      }
+
+      const dbUser = await sql`SELECT password_hash FROM users WHERE id = ${sessionUser.id} LIMIT 1`
+      if (dbUser.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+
+      const existingHash = dbUser[0].password_hash
+      if (existingHash === 'OAUTH_USER_NO_PASSWORD') {
+        return NextResponse.json(
+          { error: 'OAuth accounts cannot change password directly. Please log in with Google.' },
+          { status: 400 }
+        )
+      }
+
+      const validCurrent = await bcrypt.compare(currentPassword, existingHash)
+      if (!validCurrent) {
+        return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
+      }
+
       passwordHash = await bcrypt.hash(newPassword.trim(), 10)
     }
 
@@ -82,6 +94,15 @@ export async function PUT(req: Request) {
             password_hash = ${passwordHash}
         WHERE id = ${sessionUser.id}
       `
+
+      // Invalidate all other sessions for this user upon password change
+      const cookieStore = await cookies()
+      const currentToken = cookieStore.get('session_id')?.value || cookieStore.get('adminToken')?.value
+      if (currentToken) {
+        await sql`DELETE FROM sessions WHERE user_id = ${sessionUser.id} AND id != ${currentToken}`
+      } else {
+        await sql`DELETE FROM sessions WHERE user_id = ${sessionUser.id}`
+      }
     } else {
       await sql`
         UPDATE users
@@ -113,3 +134,4 @@ export async function PUT(req: Request) {
     )
   }
 }
+

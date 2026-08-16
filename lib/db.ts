@@ -9,7 +9,9 @@ const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || ''
 const sql = globalForDb.sql ?? postgres(dbUrl, {
   ssl: 'require',
   max: 10,
-  idle_timeout: 20,
+  connect_timeout: 5,
+  idle_timeout: 30,
+  max_lifetime: 60 * 15,
   prepare: false,
   types: {
     numeric: {
@@ -21,8 +23,6 @@ const sql = globalForDb.sql ?? postgres(dbUrl, {
   },
 })
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForDb.sql = sql
-}
+globalForDb.sql = sql
 
 export default sql

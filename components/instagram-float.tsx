@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Instagram, X, MessageCircle, ExternalLink } from 'lucide-react'
 import { SITE_CONFIG, openInstagramDm } from '@/lib/site-config'
@@ -73,7 +74,7 @@ export default function InstagramFloat() {
           {/* User's Official Instagram QR Code Image */}
           <div className="my-3 p-2 bg-white rounded-xl border border-neutral-200 shadow-inner flex flex-col items-center justify-center gap-1.5 relative group-hover:shadow-md transition-shadow">
             <div className="relative flex items-center justify-center bg-white rounded-lg overflow-hidden">
-              <img
+              <Image
                 src="/instagram-qr.jpg"
                 alt="Instagram @ZYROCORE.OFFICIAL QR Code"
                 width={176}

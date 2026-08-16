@@ -27,7 +27,7 @@ if (!dbUrl) {
   process.exit(1)
 }
 
-const sql = postgres(dbUrl, { ssl: 'require' })
+const sql = postgres(dbUrl, { ssl: 'require', prepare: false })
 
 async function run() {
   console.log('[...] Adding performance indexes to PostgreSQL...')
@@ -35,10 +35,17 @@ async function run() {
   try {
     await sql`CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);`
     await sql`CREATE INDEX IF NOT EXISTS idx_products_category_created ON products(category_id, created_at DESC);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_products_category_price ON products(category_id, price);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_products_category_rating ON products(category_id, rating DESC);`
     await sql`CREATE INDEX IF NOT EXISTS idx_products_show_home_created ON products(show_on_home, created_at DESC);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_products_featured_created ON products(is_featured, created_at DESC);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_products_bestseller_created ON products(is_best_seller, created_at DESC);`
     await sql`CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);`
     await sql`CREATE INDEX IF NOT EXISTS idx_products_rating ON products(rating DESC);`
     await sql`CREATE INDEX IF NOT EXISTS idx_sessions_id_expires ON sessions(id, expires_at);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_order_items_composite ON order_items(order_id, product_id);`
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email));`
 
     console.log('[✓] Performance indexes successfully applied to PostgreSQL!')
   } catch (err) {
@@ -49,3 +56,4 @@ async function run() {
 }
 
 run()
+

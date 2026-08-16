@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import AdminShell from '../admin-shell'
 import { Plus, Pencil, Trash2, Search, Package, Home, Eye, EyeOff, Sparkles } from 'lucide-react'
@@ -33,7 +34,20 @@ export default function AdminProductsPage() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+
+    const handleRealtimeUpdate = () => {
+      load()
+    }
+    window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
+    const interval = setInterval(load, 5000)
+
+    return () => {
+      window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     const q = search.toLowerCase()
@@ -135,7 +149,7 @@ export default function AdminProductsPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {p.images?.[0] ? (
-                            <img src={p.images[0]} alt="" className="w-9 h-9 rounded-lg object-cover bg-neutral-100 border border-neutral-200" />
+                            <Image src={p.images[0]} alt={p.name} width={36} height={36} unoptimized className="w-9 h-9 rounded-lg object-cover bg-neutral-100 border border-neutral-200" />
                           ) : (
                             <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center border border-neutral-200">
                               <Package className="w-4 h-4 text-neutral-400" />

@@ -32,37 +32,82 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const description = typeof data.description === 'string' && data.description.trim() ? data.description.trim() : null
     const discount_price = data.discount_price !== null && data.discount_price !== undefined && !isNaN(parseFloat(data.discount_price)) ? parseFloat(data.discount_price) : null
     const category_id = data.category_id && !isNaN(parseInt(data.category_id)) ? parseInt(data.category_id) : null
-    const rawSizeStock = typeof data.size_stock === 'object' && data.size_stock !== null ? data.size_stock : {}
-    const rawSizes = Array.isArray(data.sizes) ? data.sizes.filter((s: any) => typeof s === 'string' && s.trim()) : Object.keys(rawSizeStock)
-
-    const sizeStockObj: Record<string, number> = {}
-    const finalSizes: string[] = []
-
-    for (const s of rawSizes) {
-      const normalized = String(s).trim().toUpperCase()
-      if (normalized && !finalSizes.includes(normalized)) {
-        finalSizes.push(normalized)
-        sizeStockObj[normalized] = Math.max(0, parseInt(rawSizeStock[normalized] ?? rawSizeStock[s] ?? 0) || 0)
-      }
-    }
-
-    for (const [k, v] of Object.entries(rawSizeStock)) {
-      const normalized = String(k).trim().toUpperCase()
-      if (normalized && !finalSizes.includes(normalized)) {
-        finalSizes.push(normalized)
-        sizeStockObj[normalized] = Math.max(0, parseInt(v as any) || 0)
-      }
-    }
-
-    const stock = Object.values(sizeStockObj).reduce((acc: number, curr: number) => acc + curr, 0)
     const images = Array.isArray(data.images) ? data.images.filter((img: any) => typeof img === 'string' && img.trim()) : []
-
     const productDetailsJson = JSON.stringify(typeof data.product_details === 'object' && data.product_details !== null ? data.product_details : {})
-    const sizeStockJson = JSON.stringify(sizeStockObj)
-
     const is_featured = Boolean(data.is_featured)
     const is_best_seller = Boolean(data.is_best_seller)
     const show_on_home = Boolean(data.show_on_home ?? data.is_show_on_home)
+
+    // --- Stock-preservation logic ---
+    // If the payload provides an explicit, non-empty size_stock, use it.
+    // If size_stock is empty or absent (e.g. admin only edited name/description/images),
+    // fall back to whatever is already in the database — never overwrite with zeros.
+    const rawSizeStock = typeof data.size_stock === 'object' && data.size_stock !== null ? data.size_stock : {}
+    const payloadHasStock = Object.keys(rawSizeStock).length > 0
+
+    let finalSizeStockObj: Record<string, number>
+    let finalSizes: string[]
+
+    if (payloadHasStock) {
+      // Admin explicitly sent size_stock — use it (this covers the product form save)
+      const rawSizes = Array.isArray(data.sizes) && data.sizes.length > 0
+        ? data.sizes.filter((s: any) => typeof s === 'string' && s.trim())
+        : Object.keys(rawSizeStock)
+
+      finalSizeStockObj = {}
+      finalSizes = []
+
+      for (const s of rawSizes) {
+        const normalized = String(s).trim().toUpperCase()
+        if (normalized && !finalSizes.includes(normalized)) {
+          finalSizes.push(normalized)
+          // Use Number() instead of parseInt() to avoid NaN->0 coercion on undefined
+          const rawVal = rawSizeStock[normalized] ?? rawSizeStock[s]
+          finalSizeStockObj[normalized] = Math.max(0, Math.floor(Number(rawVal) || 0))
+        }
+      }
+
+      // Catch any sizes in rawSizeStock not yet in finalSizes
+      for (const [k, v] of Object.entries(rawSizeStock)) {
+        const normalized = String(k).trim().toUpperCase()
+        if (normalized && !finalSizes.includes(normalized)) {
+          finalSizes.push(normalized)
+          finalSizeStockObj[normalized] = Math.max(0, Math.floor(Number(v) || 0))
+        }
+      }
+    } else {
+      // No stock data in payload — fetch and preserve existing stock from DB
+      const existing = await sql`
+        SELECT sizes, size_stock FROM products WHERE id = ${productId}
+      `
+
+      if (existing.length === 0) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+      }
+
+      const existingProduct = existing[0]
+
+      // Parse existing size_stock safely
+      let existingSizeStock: Record<string, number> = {}
+      if (typeof existingProduct.size_stock === 'object' && existingProduct.size_stock !== null) {
+        existingSizeStock = existingProduct.size_stock as Record<string, number>
+      } else if (typeof existingProduct.size_stock === 'string') {
+        try { existingSizeStock = JSON.parse(existingProduct.size_stock) } catch {}
+      }
+
+      finalSizeStockObj = existingSizeStock
+
+      // If payload includes explicit sizes array, use it; otherwise keep DB sizes
+      if (Array.isArray(data.sizes) && data.sizes.length > 0) {
+        finalSizes = data.sizes.filter((s: any) => typeof s === 'string' && s.trim())
+      } else {
+        finalSizes = Array.isArray(existingProduct.sizes) ? existingProduct.sizes : Object.keys(existingSizeStock)
+      }
+    }
+
+    // Total stock = sum of all size quantities
+    const stock = Object.values(finalSizeStockObj).reduce((acc: number, curr: number) => acc + Math.max(0, Number(curr) || 0), 0)
+    const sizeStockJson = JSON.stringify(finalSizeStockObj)
 
     const updated = await sql`
       UPDATE products SET

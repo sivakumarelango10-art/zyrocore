@@ -9,14 +9,61 @@ export interface UploadOptions {
   allowedExtensions?: string[]
 }
 
+const DEFAULT_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic']
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/heic',
+])
+
+const FORBIDDEN_EXTENSIONS = new Set([
+  'html', 'htm', 'svg', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx',
+  'php', 'phtml', 'exe', 'bat', 'sh', 'py', 'rb', 'cgi', 'pl',
+  'jsp', 'asp', 'aspx', 'cmd', 'vbs', 'scr', 'dll', 'com', 'bin'
+])
+
+function validateImageMagicBytes(buffer: Buffer, ext: string): boolean {
+  if (buffer.length < 4) return false
+
+  // JPEG: FF D8 FF
+  if (ext === 'jpg' || ext === 'jpeg') {
+    return buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF
+  }
+
+  // PNG: 89 50 4E 47
+  if (ext === 'png') {
+    return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47
+  }
+
+  // WebP: RIFF .... WEBP
+  if (ext === 'webp') {
+    if (buffer.length < 12) return false
+    const isRiff = buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46
+    const isWebp = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+    return isRiff && isWebp
+  }
+
+  // AVIF / HEIC: starts with 'ftyp' at offset 4
+  if (ext === 'avif' || ext === 'heic') {
+    if (buffer.length < 12) return false
+    const isFtyp = buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70
+    return isFtyp
+  }
+
+  return true
+}
+
 /**
- * Consolidated image upload helper supporting Supabase Storage, Vercel Blob, and local fallback.
+ * Consolidated secure image upload helper supporting Supabase Storage, Vercel Blob, and local fallback.
  */
 export async function uploadImageToStorage(file: File, options: UploadOptions = {}): Promise<string> {
   const {
     folder = 'uploads',
     maxSizeMB = 10,
-    allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic', 'svg'],
+    allowedExtensions = DEFAULT_ALLOWED_EXTENSIONS,
   } = options
 
   if (!file) {
@@ -28,11 +75,29 @@ export async function uploadImageToStorage(file: File, options: UploadOptions = 
     throw new Error(`File size exceeds ${maxSizeMB}MB limit`)
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const isImageMime = file.type ? file.type.toLowerCase().startsWith('image/') : true
+  const rawFilename = file.name || 'image.jpg'
+  const ext = (rawFilename.split('.').pop() || '').toLowerCase().trim()
 
-  if (!allowedExtensions.includes(ext) && !isImageMime) {
-    throw new Error(`File format .${ext} is not supported. Please upload an image (JPG, PNG, WEBP).`)
+  if (!ext || FORBIDDEN_EXTENSIONS.has(ext)) {
+    throw new Error(`Forbidden file extension .${ext || 'unknown'}. Only JPG, PNG, WEBP, and AVIF images are permitted.`)
+  }
+
+  if (!allowedExtensions.includes(ext)) {
+    throw new Error(`File format .${ext} is not supported. Please upload an allowed image format (${allowedExtensions.join(', ')}).`)
+  }
+
+  if (file.type) {
+    const cleanType = file.type.toLowerCase().trim()
+    if (!ALLOWED_MIME_TYPES.has(cleanType)) {
+      throw new Error(`Invalid file MIME type "${file.type}". Only JPG, PNG, WEBP, and AVIF images are allowed.`)
+    }
+  }
+
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
+
+  if (!validateImageMagicBytes(buffer, ext)) {
+    throw new Error('File content signature does not match a valid image format.')
   }
 
   const sanitizedExt = ext === 'blob' ? 'jpg' : ext
@@ -52,8 +117,6 @@ export async function uploadImageToStorage(file: File, options: UploadOptions = 
   if (supabaseUrl && supabaseKey) {
     const buckets = ['product', 'products', 'uploads']
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
 
     for (const bucketName of buckets) {
       try {
@@ -87,9 +150,6 @@ export async function uploadImageToStorage(file: File, options: UploadOptions = 
   // 3. Fallback to local filesystem / public directory
   if (!fileUrl) {
     try {
-      const bytes = await file.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-
       const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true })
@@ -102,8 +162,7 @@ export async function uploadImageToStorage(file: File, options: UploadOptions = 
       fileUrl = `/uploads/${localFileName}`
     } catch (localErr) {
       console.warn('[upload] Local disk write failed. Using base64 Data URI:', localErr)
-      const bytes = await file.arrayBuffer()
-      const base64 = Buffer.from(bytes).toString('base64')
+      const base64 = buffer.toString('base64')
       const mime = file.type || `image/${sanitizedExt}`
       fileUrl = `data:${mime};base64,${base64}`
     }

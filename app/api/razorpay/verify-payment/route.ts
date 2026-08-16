@@ -60,54 +60,101 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 3. Atomically update order status & deduct stock
-    await sql.begin(async (txSql) => {
-      await txSql`
-        UPDATE orders
-        SET payment_status = 'paid',
-            status = 'confirmed',
-            payment_method = 'Razorpay',
-            razorpay_order_id = ${razorpay_order_id},
-            razorpay_payment_id = ${razorpay_payment_id},
-            razorpay_signature = ${razorpay_signature},
-            updated_at = NOW()
-        WHERE id = ${order_id} AND user_id = ${user.id}
-      `
+    // 3. Atomically update order status & deduct stock with row-level locking
+    try {
+      const result = await sql.begin(async (txSql) => {
+        const orderItems = await txSql`
+          SELECT product_id, quantity, size FROM order_items WHERE order_id = ${order_id}
+        `
 
-      const orderItems = await txSql`
-        SELECT product_id, quantity, size FROM order_items WHERE order_id = ${order_id}
-      `
+        // Step A: Lock and validate all products/sizes before deducting stock
+        for (const item of orderItems) {
+          if (!item.product_id) continue
 
-      for (const item of orderItems) {
-        if (item.product_id) {
+          const lockedProduct = await txSql`
+            SELECT id, name, stock, size_stock FROM products WHERE id = ${item.product_id} FOR UPDATE
+          `
+
+          if (lockedProduct.length === 0) {
+            throw new Error(`PRODUCT_NOT_FOUND:${item.product_id}`)
+          }
+
+          const product = lockedProduct[0]
+          const reqQty = Number(item.quantity) || 1
+
+          if (Number(product.stock) < reqQty) {
+            throw new Error(`INSUFFICIENT_STOCK:${product.name} (Available: ${product.stock}, Requested: ${reqQty})`)
+          }
+
           if (item.size) {
-            await txSql`
+            const normSize = String(item.size).trim().toUpperCase()
+            let sizeStockMap: Record<string, number> = {}
+            if (typeof product.size_stock === 'object' && product.size_stock !== null) {
+              sizeStockMap = product.size_stock as Record<string, number>
+            } else if (typeof product.size_stock === 'string') {
+              try {
+                sizeStockMap = JSON.parse(product.size_stock)
+              } catch { }
+            }
+
+            const matchedKey = Object.keys(sizeStockMap).find(k => k.trim().toUpperCase() === normSize) || normSize
+            const availForSize = Math.max(0, Number(sizeStockMap[matchedKey]) || 0)
+            if (availForSize < reqQty) {
+              throw new Error(`INSUFFICIENT_SIZE_STOCK:${product.name} Size ${normSize} (Available: ${availForSize}, Requested: ${reqQty})`)
+            }
+          }
+        }
+
+        // Step B: Atomically deduct stock for validated items using row-level compare-and-swap
+        for (const item of orderItems) {
+          if (!item.product_id) continue
+          const reqQty = Number(item.quantity) || 1
+
+          if (item.size) {
+            const normSize = String(item.size).trim().toUpperCase()
+            // Deduct size-specific stock and recalculate total stock from sum of all sizes
+            const updated = await txSql`
               UPDATE products
               SET size_stock = jsonb_set(
                     COALESCE(size_stock, '{}'::jsonb),
-                    ARRAY[${item.size}]::text[],
-                    to_jsonb(GREATEST(0, COALESCE((size_stock->>${item.size})::int, 0) - ${item.quantity}))
+                    ARRAY[${normSize}]::text[],
+                    to_jsonb(GREATEST(0, COALESCE((size_stock->>${normSize})::int, COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0)) - ${reqQty}))
                   ),
-                  stock = (
+                  -- Recalculate total stock as sum of all size_stock values after deduction
+                  stock = GREATEST(0, (
                     SELECT COALESCE(SUM(val::int), 0)
                     FROM jsonb_each_text(
                       jsonb_set(
                         COALESCE(size_stock, '{}'::jsonb),
-                        ARRAY[${item.size}]::text[],
-                        to_jsonb(GREATEST(0, COALESCE((size_stock->>${item.size})::int, 0) - ${item.quantity}))
+                        ARRAY[${normSize}]::text[],
+                        to_jsonb(GREATEST(0, COALESCE((size_stock->>${normSize})::int, COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0)) - ${reqQty}))
                       )
                     ) AS t(key, val)
-                  ),
+                  )),
                   updated_at = NOW()
               WHERE id = ${item.product_id}
+                AND (
+                  COALESCE((size_stock->>${normSize})::int, 0) >= ${reqQty}
+                  OR COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0) >= ${reqQty}
+                )
+              RETURNING id
             `
+
+            if (updated.length === 0) {
+              throw new Error(`INSUFFICIENT_STOCK:Stock changed during checkout for product #${item.product_id}`)
+            }
           } else {
-            await txSql`
+            const updated = await txSql`
               UPDATE products
-              SET stock = GREATEST(0, stock - ${item.quantity}),
+              SET stock = stock - ${reqQty},
                   updated_at = NOW()
-              WHERE id = ${item.product_id}
+              WHERE id = ${item.product_id} AND stock >= ${reqQty}
+              RETURNING id
             `
+
+            if (updated.length === 0) {
+              throw new Error(`INSUFFICIENT_STOCK:Stock changed during checkout for product #${item.product_id}`)
+            }
           }
 
           try {
@@ -119,17 +166,76 @@ export async function POST(req: NextRequest) {
             console.warn('[verify-payment] Revalidation warning:', revalErr)
           }
         }
+
+        // Step C: Mark order paid & confirmed
+        await txSql`
+          UPDATE orders
+          SET payment_status = 'paid',
+              status = 'confirmed',
+              payment_method = 'Razorpay',
+              razorpay_order_id = ${razorpay_order_id},
+              razorpay_payment_id = ${razorpay_payment_id},
+              razorpay_signature = ${razorpay_signature},
+              updated_at = NOW()
+          WHERE id = ${order_id} AND user_id = ${user.id}
+        `
+
+        // Step D: Check for low stock alerts post-deduction to include in report
+        const lowStockAlerts: string[] = []
+        for (const item of orderItems) {
+          if (!item.product_id) continue
+          const [updatedProd] = await txSql`
+            SELECT id, name, stock, size_stock FROM products WHERE id = ${item.product_id}
+          `
+          if (updatedProd) {
+            const curStock = Number(updatedProd.stock) || 0
+            if (curStock <= 10) {
+              lowStockAlerts.push(`Low Stock Warning: "${updatedProd.name}" (#${updatedProd.id}) overall stock is down to ${curStock} unit(s).`)
+            }
+            if (item.size) {
+              const normSize = String(item.size).trim().toUpperCase()
+              const sizeStockMap = typeof updatedProd.size_stock === 'object' && updatedProd.size_stock ? updatedProd.size_stock : {}
+              const sizeQty = Number(sizeStockMap[normSize]) || 0
+              if (sizeQty <= 5) {
+                lowStockAlerts.push(`Size Restock Alert: "${updatedProd.name}" Size ${normSize} has only ${sizeQty} unit(s) remaining.`)
+              }
+            }
+          }
+        }
+
+        // Clear cart items for user after successful payment
+        await txSql`DELETE FROM cart_items WHERE user_id = ${user.id}`
+
+        return { lowStockAlerts }
+      })
+
+      return NextResponse.json({
+        success: true,
+        order_id: order_id,
+        message: 'Payment verified successfully',
+        low_stock_alerts: result?.lowStockAlerts || [],
+      })
+    } catch (txError: any) {
+      const msg = String(txError?.message || '')
+      if (msg.startsWith('INSUFFICIENT_STOCK') || msg.startsWith('INSUFFICIENT_SIZE_STOCK')) {
+        await sql`
+          UPDATE orders
+          SET payment_status = 'refund_required',
+              status = 'cancelled',
+              razorpay_order_id = ${razorpay_order_id},
+              razorpay_payment_id = ${razorpay_payment_id},
+              razorpay_signature = ${razorpay_signature},
+              notes = ${`Payment received but item went out of stock. Refund required. Details: ${msg}`},
+              updated_at = NOW()
+          WHERE id = ${order_id} AND user_id = ${user.id}
+        `
+        return NextResponse.json(
+          { error: 'Item stock is no longer available. Payment received and refund initiated.', refund_required: true },
+          { status: 409 }
+        )
       }
-
-      // Clear cart items for user after successful payment
-      await txSql`DELETE FROM cart_items WHERE user_id = ${user.id}`
-    })
-
-    return NextResponse.json({
-      success: true,
-      order_id: order_id,
-      message: 'Payment verified successfully',
-    })
+      throw txError
+    }
   } catch (error: any) {
     console.error('[razorpay/verify-payment] Exception:', error)
     return NextResponse.json({ error: error?.message || 'Payment verification error' }, { status: 500 })

@@ -163,6 +163,7 @@ try {
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_pincode VARCHAR(50)`
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(100) DEFAULT 'India'`
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS courier_name VARCHAR(255)`
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT`
 
   await sql`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -247,6 +248,8 @@ try {
   await sql`CREATE INDEX IF NOT EXISTS idx_cart_user ON cart_items(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_cart_user_product_size ON cart_items(user_id, product_id, size)`
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_status ON orders(user_id, status)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_tracking_number ON orders(tracking_number)`
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`
   await sql`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`
@@ -269,17 +272,22 @@ try {
 
   // === CREATE ADMIN ===
   const email = process.env.ADMIN_EMAIL || 'bpzyrocore@gmail.com'
-  const password = process.env.ADMIN_INITIAL_PASSWORD || 'Globe@200'
-  const name = 'ZYRØCORE Admin'
-  const hash = await bcrypt.hash(password, 12)
+  const password = process.env.ADMIN_INITIAL_PASSWORD
 
-  await sql`
-    INSERT INTO users (name, email, password_hash, role, status)
-    VALUES (${name}, ${email}, ${hash}, 'admin', 'active')
-    ON CONFLICT (email) DO NOTHING
-  `
+  if (!password) {
+    console.warn('[setup-db] Skipping initial admin user creation: ADMIN_INITIAL_PASSWORD is not set.')
+  } else {
+    const name = 'ZYRØCORE Admin'
+    const hash = await bcrypt.hash(password, 12)
 
-  console.log('[✓] Admin user checked/created:', email)
+    await sql`
+      INSERT INTO users (name, email, password_hash, role, status)
+      VALUES (${name}, ${email}, ${hash}, 'admin', 'active')
+      ON CONFLICT (email) DO NOTHING
+    `
+    console.log('[✓] Admin user checked/created:', email)
+  }
+
   console.log('[✓] Database schema setup complete.')
 } catch (err) {
   console.warn('[setup-db] Database setup encountered an error (will not block build):', err)

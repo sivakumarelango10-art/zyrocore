@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import AdminShell from '../admin-shell'
 import { ShoppingBag, Search, X, ChevronDown, Truck, CreditCard, User, MapPin, Package, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -66,6 +67,7 @@ interface Order {
   shipping_country?: string | null
   courier_name?: string | null
   tracking_number?: string | null
+  tracking_url?: string | null
   notes?: string | null
   items?: OrderItem[]
 }
@@ -86,6 +88,7 @@ export default function AdminOrdersPage() {
   // Tracking inputs
   const [courierInput, setCourierInput] = useState('')
   const [trackingInput, setTrackingInput] = useState('')
+  const [trackingUrlInput, setTrackingUrlInput] = useState('')
 
   const statusFilterRef = useRef(statusFilter)
 
@@ -113,6 +116,7 @@ export default function AdminOrdersPage() {
           setFullOrder(data.order)
           setCourierInput(data.order.courier_name || '')
           setTrackingInput(data.order.tracking_number || '')
+          setTrackingUrlInput(data.order.tracking_url || '')
         }
       })
       .finally(() => setLoadingDetails(false))
@@ -121,18 +125,24 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     load()
 
-    // Real-Time auto-update interval when active
+    const handleRealtimeUpdate = () => {
+      load(statusFilterRef.current, true)
+    }
+
     const handleVisibilityChange = () => {
       if (!document.hidden) load(statusFilterRef.current, true)
     }
 
+    window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     const interval = setInterval(() => {
       if (!document.hidden) load(statusFilterRef.current, true)
-    }, 10000)
+    }, 5000)
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       clearInterval(interval)
+      window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
@@ -181,15 +191,19 @@ export default function AdminOrdersPage() {
       body: JSON.stringify({
         courier_name: courierInput.trim() || null,
         tracking_number: trackingInput.trim() || null,
+        tracking_url: trackingUrlInput.trim() || null,
       }),
     })
 
+    const resData = await res.json().catch(() => ({}))
+
     if (res.ok) {
       toast.success(`Tracking details saved for Order #${fullOrder.id}`)
-      setOrders(prev => prev.map(o => o.id === fullOrder.id ? { ...o, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null } : o))
-      setFullOrder(prev => prev ? { ...prev, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null } : null)
+      const updatedUrl = resData.order?.tracking_url ?? (trackingUrlInput.trim() || null)
+      setOrders(prev => prev.map(o => o.id === fullOrder.id ? { ...o, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null, tracking_url: updatedUrl } : o))
+      setFullOrder(prev => prev ? { ...prev, courier_name: courierInput.trim() || null, tracking_number: trackingInput.trim() || null, tracking_url: updatedUrl } : null)
     } else {
-      toast.error('Failed to save tracking details')
+      toast.error(resData.error || 'Failed to save tracking details')
     }
     setUpdatingId(null)
   }
@@ -422,6 +436,17 @@ export default function AdminOrdersPage() {
                         />
                       </div>
 
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-neutral-500">Tracking Website URL</label>
+                        <input
+                          type="url"
+                          value={trackingUrlInput}
+                          onChange={e => setTrackingUrlInput(e.target.value)}
+                          placeholder="https://courier.example.com/track"
+                          className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-black transition-colors"
+                        />
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleSaveTracking}
@@ -446,7 +471,7 @@ export default function AdminOrdersPage() {
                           <div key={item.id} className="p-2.5 flex items-center justify-between gap-3 text-xs bg-white">
                             <div className="flex items-center gap-2.5 min-w-0">
                               {imgUrl ? (
-                                <img src={imgUrl} alt="" className="w-8 h-8 rounded-lg object-cover bg-neutral-100 border border-neutral-200 flex-shrink-0" />
+                                <Image src={imgUrl} alt={item.product_name || 'Product'} width={32} height={32} unoptimized className="w-8 h-8 rounded-lg object-cover bg-neutral-100 border border-neutral-200 flex-shrink-0" />
                               ) : (
                                 <div className="w-8 h-8 rounded-lg bg-neutral-100 border border-neutral-200 flex items-center justify-center flex-shrink-0">
                                   <Package className="w-4 h-4 text-neutral-400" />

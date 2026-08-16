@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { PrimaryButton } from '@/components/ui/primary-button'
+import BrandStorySection from './brand-story-section'
 
 export default function JourneySection() {
   return (
@@ -158,6 +159,9 @@ export default function JourneySection() {
           </div>
         </div>
       </div>
+
+      {/* Brand Purpose & Craftsmanship Philosophy */}
+      <BrandStorySection />
     </section>
   )
 }

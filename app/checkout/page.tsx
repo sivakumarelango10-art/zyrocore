@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
@@ -219,6 +220,20 @@ export default function CheckoutPage() {
         quantity: item.quantity,
         size: item.size,
       }))
+
+      // 0. Pre-validate cart items against real-time database stock
+      const valRes = await fetch('/api/cart/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: orderItems }),
+      })
+      const valData = await valRes.json()
+      if (valRes.ok && !valData.valid) {
+        const firstErr = valData.errors?.[0]?.message || 'Some items in your cart are no longer available in the requested quantity.'
+        toast.error(firstErr)
+        setPlacing(false)
+        return
+      }
 
       // 1. Create order record in backend DB
       const res = await fetch('/api/orders', {
@@ -468,7 +483,7 @@ export default function CheckoutPage() {
                         <div key={item.id} className="flex gap-3 items-center">
                           <div className="relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                             {item.images?.[0] && (
-                              <img src={item.images[0]} alt={item.name} className="w-full h-full object-cover" />
+                              <Image src={item.images[0]} alt={item.name} fill sizes="48px" className="object-cover" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">

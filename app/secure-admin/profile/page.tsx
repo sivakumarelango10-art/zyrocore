@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import {
   User, Camera, Trash2, ShieldCheck, KeyRound, Save, CheckCircle2, XCircle, AlertCircle, Eye, EyeOff, Loader2, RefreshCw
 } from 'lucide-react'
@@ -327,7 +328,7 @@ export default function AdminProfilePage() {
             <div className="relative group">
               <div className="w-24 h-24 rounded-full bg-neutral-900 flex items-center justify-center text-white text-3xl font-bold overflow-hidden border-2 border-neutral-200 shadow-inner">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                  <Image src={avatarUrl} alt={name || 'Admin'} width={96} height={96} unoptimized className="w-full h-full object-cover" />
                 ) : (
                   name.charAt(0).toUpperCase() || 'A'
                 )}

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { use, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { CheckCircle, Package, Star, Copy, Check, Truck, MapPin } from 'lucide-react'
+import { CheckCircle, Package, Star, Copy, Check, Truck, MapPin, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
@@ -136,23 +136,42 @@ function OrderDetailContent({ id }: { id: string }) {
               </p>
             </div>
 
-            <Button
-              type="button"
-              onClick={() => handleCopyTracking(order.tracking_number)}
-              variant="outline"
-              size="sm"
-              className="font-semibold text-xs flex items-center gap-2 h-9 px-4 shrink-0"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" /> Copy Tracking Number
-                </>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => handleCopyTracking(order.tracking_number)}
+                variant="outline"
+                size="sm"
+                className="font-semibold text-xs flex items-center gap-2 h-9 px-4 shrink-0"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" /> Copy Tracking Number
+                  </>
+                )}
+              </Button>
+
+              {order.tracking_url && (
+                <Button
+                  asChild
+                  variant="default"
+                  size="sm"
+                  className="font-semibold text-xs flex items-center gap-2 h-9 px-4 shrink-0 bg-black text-white hover:bg-neutral-800"
+                >
+                  <a
+                    href={order.tracking_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Track Package
+                  </a>
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
         </div>
       )}

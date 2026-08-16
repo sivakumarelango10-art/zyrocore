@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import AdminShell from '../admin-shell'
-import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, ListPlus, Crop, UploadCloud, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, ListPlus, Crop, UploadCloud, Eye, Sparkles, Wand2 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { compressImageFile } from '@/lib/image-compress'
@@ -34,6 +35,8 @@ export default function ProductForm({ productId }: ProductFormProps) {
   const [categories, setCategories] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(isEdit)
+  const [generatingAi, setGeneratingAi] = useState(false)
+  const [stockLoaded, setStockLoaded] = useState(!isEdit)
 
   const [form, setForm] = useState({
     name: '',
@@ -53,10 +56,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
     isEdit ? {} : { S: 0, M: 0, L: 0, XL: 0, XXL: 0 }
   )
 
-  // Staged client-side images (not yet uploaded to server)
   const [stagedImages, setStagedImages] = useState<StagedImageItem[]>([])
-
-  // Crop Modal state
   const [cropModal, setCropModal] = useState<{
     isOpen: boolean
     imageSrc: string
@@ -71,21 +71,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
     isExisting: false,
   })
 
-  // Details
-  const [details, setDetails] = useState({
-    material: '',
-    fabric: '',
-    gsm: '',
-    fit: '',
-    sleeve_type: '',
-    neck_type: '',
-    pattern: '',
-    origin: '',
-    manufacturer: '',
-    care: '',
-    wash: '',
-    warranty: '',
-  })
+  // Open Details & Specifications list (Key-Value pairs)
   const [customDetails, setCustomDetails] = useState<CustomDetail[]>([])
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
@@ -94,6 +80,54 @@ export default function ProductForm({ productId }: ProductFormProps) {
   const [dragOver, setDragOver] = useState(false)
 
   const set = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }))
+
+  const handleGenerateGeminiAi = async () => {
+    if (!form.name.trim()) {
+      toast.error('Please enter a Product Name first to generate with Gemini AI!')
+      return
+    }
+    setGeneratingAi(true)
+    const toastId = toast.loading('Gemini AI is generating description & specifications...')
+    try {
+      const selectedCat = categories.find(c => String(c.id) === form.category_id)?.name
+      const res = await fetch('/api/admin/generate-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name, category: selectedCat }),
+      })
+      const data = await res.json()
+      if (res.ok && data) {
+        if (data.description) {
+          set('description', data.description)
+        }
+        if (data.product_details && typeof data.product_details === 'object') {
+          const newSpecs: CustomDetail[] = Object.entries(data.product_details).map(([k, v]) => ({
+            key: k,
+            value: String(v),
+          }))
+          setCustomDetails(newSpecs)
+        }
+        if (Array.isArray(data.suggested_sizes) && data.suggested_sizes.length > 0) {
+          const mergedSizes = Array.from(new Set([...form.sizes, ...data.suggested_sizes]))
+          set('sizes', mergedSizes)
+          const newStockMap = { ...sizeStock }
+          mergedSizes.forEach(s => {
+            if (newStockMap[s] === undefined) newStockMap[s] = 10
+          })
+          setSizeStock(newStockMap)
+          const total = Object.values(newStockMap).reduce((a, b) => a + (b || 0), 0)
+          set('stock', String(total))
+        }
+        toast.success('Generated description and specs with Gemini AI!', { id: toastId })
+      } else {
+        toast.error(data?.error || 'Failed to generate content', { id: toastId })
+      }
+    } catch {
+      toast.error('Error connecting to Gemini AI service', { id: toastId })
+    } finally {
+      setGeneratingAi(false)
+    }
+  }
 
   // Revoke object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -245,62 +279,62 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
   useEffect(() => {
     if (!productId) return
-    fetch(`/api/products/${productId}`).then(r => r.ok ? r.json() : null).then(data => {
-      const p = data?.product
-      if (p) {
-        const dbSizeStock = (p.size_stock && typeof p.size_stock === 'object') ? p.size_stock : {}
-        const dbSizes = (Array.isArray(p.sizes) && p.sizes.length > 0)
-          ? Array.from(new Set([...p.sizes, ...Object.keys(dbSizeStock)]))
-          : Object.keys(dbSizeStock)
 
-        const initialSizeStock: Record<string, number> = {}
-        dbSizes.forEach((s: string) => {
-          initialSizeStock[s] = Math.max(0, Number(dbSizeStock[s]) || 0)
-        })
+    const loadProductData = () => {
+      fetch(`/api/products/${productId}`).then(r => r.ok ? r.json() : null).then(data => {
+        const p = data?.product
+        if (p) {
+          const dbSizeStock = (p.size_stock && typeof p.size_stock === 'object') ? p.size_stock : {}
+          const dbSizes = (Array.isArray(p.sizes) && p.sizes.length > 0)
+            ? Array.from(new Set([...p.sizes, ...Object.keys(dbSizeStock)]))
+            : Object.keys(dbSizeStock)
 
-        setForm({
-          name: p.name,
-          description: p.description || '',
-          price: String(p.price),
-          discount_price: p.discount_price ? String(p.discount_price) : '',
-          category_id: p.category_id ? String(p.category_id) : '',
-          stock: String(p.stock),
-          images: p.images || [],
-          sizes: dbSizes,
-          is_featured: p.is_featured,
-          is_best_seller: p.is_best_seller,
-          show_on_home: p.show_on_home ?? false,
-        })
-        setSizeStock(initialSizeStock)
-
-        if (p.product_details) {
-          const pd = p.product_details
-          setDetails({
-            material: pd['Material'] || '',
-            fabric: pd['Fabric'] || '',
-            gsm: pd['GSM'] || '',
-            fit: pd['Fit'] || '',
-            sleeve_type: pd['Sleeve Type'] || '',
-            neck_type: pd['Neck Type'] || '',
-            pattern: pd['Pattern'] || '',
-            origin: pd['Country of Origin'] || '',
-            manufacturer: pd['Manufacturer'] || '',
-            care: pd['Care Instructions'] || '',
-            wash: pd['Wash Instructions'] || '',
-            warranty: pd['Warranty'] || '',
+          const initialSizeStock: Record<string, number> = {}
+          dbSizes.forEach((s: string) => {
+            initialSizeStock[s] = Math.max(0, Math.floor(Number(dbSizeStock[s]) || 0))
           })
 
-          const knownKeys = ['Material', 'Fabric', 'GSM', 'Fit', 'Sleeve Type', 'Neck Type', 'Pattern', 'Country of Origin', 'Manufacturer', 'Care Instructions', 'Wash Instructions', 'Warranty']
-          const customs: CustomDetail[] = []
-          Object.entries(pd).forEach(([k, v]) => {
-            if (!knownKeys.includes(k) && typeof v === 'string') {
-              customs.push({ key: k, value: v })
-            }
-          })
-          setCustomDetails(customs)
+          setForm(prev => ({
+            ...prev,
+            name: prev.name || p.name,
+            description: prev.description || p.description || '',
+            price: prev.price || String(p.price),
+            discount_price: prev.discount_price || (p.discount_price ? String(p.discount_price) : ''),
+            category_id: prev.category_id || (p.category_id ? String(p.category_id) : ''),
+            stock: String(p.stock),
+            images: prev.images.length > 0 ? prev.images : (p.images || []),
+            sizes: dbSizes,
+            is_featured: prev.is_featured ?? p.is_featured,
+            is_best_seller: prev.is_best_seller ?? p.is_best_seller,
+            show_on_home: prev.show_on_home ?? (p.show_on_home ?? false),
+          }))
+          setSizeStock(initialSizeStock)
+          setStockLoaded(true)
+
+          if (p.product_details && typeof p.product_details === 'object') {
+            const customs: CustomDetail[] = Object.entries(p.product_details).map(([k, v]) => ({
+              key: k,
+              value: typeof v === 'object' ? JSON.stringify(v) : String(v),
+            }))
+            setCustomDetails(prev => prev.length > 0 ? prev : customs)
+          }
         }
-      }
-    }).finally(() => setLoading(false))
+      }).finally(() => setLoading(false))
+    }
+
+    loadProductData()
+
+    const handleRealtimeUpdate = () => {
+      loadProductData()
+    }
+
+    window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
+    const interval = setInterval(loadProductData, 4000)
+
+    return () => {
+      window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
+      clearInterval(interval)
+    }
   }, [productId])
 
   const addSize = () => {
@@ -330,13 +364,15 @@ export default function ProductForm({ productId }: ProductFormProps) {
     set('stock', String(total))
   }
 
-  const handleSizeStockChange = (size: string, qty: number) => {
-    const validQty = Math.max(0, qty)
+  const handleSizeStockChange = (size: string, rawValue: string | number) => {
+    // Use Number() not parseInt() — Number('') = 0 (safe), parseInt('') = NaN (causes 0 bug)
+    // Math.floor ensures integer, Math.max(0) prevents negatives
+    const validQty = Math.max(0, Math.floor(Number(rawValue) || 0))
     const newStock = { ...sizeStock, [size]: validQty }
     setSizeStock(newStock)
 
     // Auto-calculate total stock
-    const total = Object.values(newStock).reduce((acc, curr) => acc + (curr || 0), 0)
+    const total = Object.values(newStock).reduce((acc, curr) => acc + Math.max(0, Number(curr) || 0), 0)
     set('stock', String(total))
   }
 
@@ -360,6 +396,13 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Guard: don't allow submission in edit mode if stock hasn't loaded from DB yet
+    if (isEdit && !stockLoaded) {
+      toast.error('Product data is still loading. Please wait a moment and try again.')
+      return
+    }
+
     setSaving(true)
 
     // Step 1: Upload staged images to server now
@@ -398,23 +441,12 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
     const finalImageUrls = [...form.images, ...newlyUploadedUrls].slice(0, 6)
 
-    // Compile product details object
+    // Compile product details object from open specifications
     const finalDetails: Record<string, string> = {}
-    if (details.material) finalDetails['Material'] = details.material
-    if (details.fabric) finalDetails['Fabric'] = details.fabric
-    if (details.gsm) finalDetails['GSM'] = details.gsm
-    if (details.fit) finalDetails['Fit'] = details.fit
-    if (details.sleeve_type) finalDetails['Sleeve Type'] = details.sleeve_type
-    if (details.neck_type) finalDetails['Neck Type'] = details.neck_type
-    if (details.pattern) finalDetails['Pattern'] = details.pattern
-    if (details.origin) finalDetails['Country of Origin'] = details.origin
-    if (details.manufacturer) finalDetails['Manufacturer'] = details.manufacturer
-    if (details.care) finalDetails['Care Instructions'] = details.care
-    if (details.wash) finalDetails['Wash Instructions'] = details.wash
-    if (details.warranty) finalDetails['Warranty'] = details.warranty
-
     customDetails.forEach(cd => {
-      if (cd.key && cd.value) finalDetails[cd.key] = cd.value
+      if (cd.key && cd.key.trim() && cd.value && cd.value.trim()) {
+        finalDetails[cd.key.trim()] = cd.value.trim()
+      }
     })
 
     // Compute exact overall stock from sizeStock
@@ -445,6 +477,9 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
       if (res.ok) {
         toast.success(isEdit ? 'Product updated successfully' : 'Product created successfully')
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('zyrocore-realtime-update'))
+        }
         router.push('/secure-admin/products')
         router.refresh()
       } else {
@@ -485,7 +520,14 @@ export default function ProductForm({ productId }: ProductFormProps) {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-neutral-900 text-2xl font-bold tracking-tight">{isEdit ? 'Edit Product' : 'Add New Product'}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-neutral-900 text-2xl font-bold tracking-tight">{isEdit ? `Edit Product` : 'Add New Product'}</h1>
+              {isEdit && productId && (
+                <span className="text-xs font-mono font-bold bg-neutral-100 border border-neutral-200 text-neutral-800 px-2.5 py-1 rounded-lg">
+                  Product #{productId}
+                </span>
+              )}
+            </div>
             <p className="text-neutral-500 text-sm">{isEdit ? 'Update product details, stock, and specifications' : 'Fill in the details below to list a new product'}</p>
           </div>
         </div>
@@ -527,12 +569,12 @@ export default function ProductForm({ productId }: ProductFormProps) {
                 <label className={labelCls}>Total Stock (Auto-Calculated)</label>
                 <input
                   type="number"
-                  value={form.stock || '0'}
+                  value={Object.values(sizeStock).reduce((acc, curr) => acc + Math.max(0, Number(curr) || 0), 0)}
                   readOnly
                   disabled
                   placeholder="0"
                   suppressHydrationWarning
-                  className={inputCls + ' bg-neutral-100 font-mono font-bold text-neutral-800 cursor-not-allowed'}
+                  className={inputCls + ' bg-neutral-100 font-mono font-bold text-neutral-900 cursor-not-allowed'}
                 />
               </div>
             </div>
@@ -596,12 +638,12 @@ export default function ProductForm({ productId }: ProductFormProps) {
                   {/* Render Existing Uploaded Images */}
                   {form.images.map((url, idx) => (
                     <div key={`existing-${idx}`} className="relative group aspect-square rounded-xl border border-neutral-200 bg-neutral-50 overflow-hidden shadow-sm flex flex-col">
-                      <img src={url} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
+                      <Image src={url} alt={`Product ${idx + 1}`} fill sizes="120px" unoptimized className="object-cover" />
                       {idx === 0 && (
                         <span className="absolute top-1.5 left-1.5 bg-black text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow z-10">MAIN</span>
                       )}
 
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2 z-20">
                         <div className="flex justify-end">
                           <button
                             type="button"
@@ -631,12 +673,12 @@ export default function ProductForm({ productId }: ProductFormProps) {
                   {/* Render Staged Local Images */}
                   {stagedImages.map((staged, idx) => (
                     <div key={staged.id} className="relative group aspect-square rounded-xl border-2 border-emerald-500/80 bg-neutral-50 overflow-hidden shadow-sm flex flex-col">
-                      <img src={staged.previewUrl} alt={staged.fileName} className="w-full h-full object-cover" />
+                      <Image src={staged.previewUrl} alt={staged.fileName} fill sizes="120px" unoptimized className="object-cover" />
                       <span className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow z-10">
                         {staged.isCropped ? 'CROPPED' : 'STAGED'}
                       </span>
 
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2 z-20">
                         <div className="flex justify-end">
                           <button
                             type="button"
@@ -669,104 +711,130 @@ export default function ProductForm({ productId }: ProductFormProps) {
             )}
           </div>
 
-          {/* Product Details & Specifications */}
+          {/* Product Details & Specifications — Open Freeform & Gemini AI Powered */}
           <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <div>
-              <h2 className="text-neutral-900 text-sm font-bold">Product Details & Specifications</h2>
-              <p className="text-neutral-400 text-xs mt-0.5">Structured technical specs shown separately from the main description.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
+              <div>
+                <h2 className="text-neutral-900 text-sm font-bold flex items-center gap-2">
+                  <span>Product Details & Specifications</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                    Freeform & AI Powered
+                  </span>
+                </h2>
+                <p className="text-neutral-400 text-xs mt-0.5">Fill in whatever specifications you need — keep as open text or key-value pairs.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGenerateGeminiAi}
+                disabled={generatingAi}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-black hover:from-purple-700 hover:to-neutral-900 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${generatingAi ? 'animate-spin' : ''}`} />
+                {generatingAi ? 'Gemini AI Generating...' : 'Auto-Fill with Gemini AI'}
+              </button>
             </div>
 
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <label className={labelCls}>Material</label>
-                <input value={details.material} onChange={e => setDetails(d => ({ ...d, material: e.target.value }))} placeholder="e.g. 100% French Terry Cotton" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Fabric</label>
-                <input value={details.fabric} onChange={e => setDetails(d => ({ ...d, fabric: e.target.value }))} placeholder="e.g. Premium Heavyweight" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>GSM</label>
-                <input value={details.gsm} onChange={e => setDetails(d => ({ ...d, gsm: e.target.value }))} placeholder="e.g. 340 GSM" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Fit</label>
-                <input value={details.fit} onChange={e => setDetails(d => ({ ...d, fit: e.target.value }))} placeholder="e.g. Relaxed Oversized Fit" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Sleeve Type</label>
-                <input value={details.sleeve_type} onChange={e => setDetails(d => ({ ...d, sleeve_type: e.target.value }))} placeholder="e.g. Full Sleeve / Drop Shoulder" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Neck Type</label>
-                <input value={details.neck_type} onChange={e => setDetails(d => ({ ...d, neck_type: e.target.value }))} placeholder="e.g. Double-Layered Hood" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Pattern</label>
-                <input value={details.pattern} onChange={e => setDetails(d => ({ ...d, pattern: e.target.value }))} placeholder="e.g. Tone-on-tone Embroidery" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Country of Origin</label>
-                <input value={details.origin} onChange={e => setDetails(d => ({ ...d, origin: e.target.value }))} placeholder="e.g. India (Tamil Nadu)" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Manufacturer</label>
-                <input value={details.manufacturer} onChange={e => setDetails(d => ({ ...d, manufacturer: e.target.value }))} placeholder="e.g. ZYRØCORE Apparels" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Care Instructions</label>
-                <input value={details.care} onChange={e => setDetails(d => ({ ...d, care: e.target.value }))} placeholder="e.g. Machine wash cold, do not bleach" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Wash Instructions</label>
-                <input value={details.wash} onChange={e => setDetails(d => ({ ...d, wash: e.target.value }))} placeholder="e.g. Wash inside out with like colors" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Warranty</label>
-                <input value={details.warranty} onChange={e => setDetails(d => ({ ...d, warranty: e.target.value }))} placeholder="e.g. 6 Months Quality Guarantee" className={inputCls} />
+            {/* Quick Add Specification Suggestions */}
+            <div className="space-y-1.5">
+              <label className={labelCls}>Quick Add Common Specifications</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Material', 'Fabric', 'GSM', 'Fit', 'Sleeve Type',
+                  'Neck Type', 'Pattern', 'Care Instructions', 'Country of Origin', 'Warranty'
+                ].map(specKey => (
+                  <button
+                    key={specKey}
+                    type="button"
+                    onClick={() => {
+                      if (!customDetails.some(cd => cd.key.toLowerCase() === specKey.toLowerCase())) {
+                        setCustomDetails(prev => [...prev, { key: specKey, value: '' }])
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-neutral-600 bg-neutral-50 hover:bg-neutral-100 hover:text-black border border-neutral-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3 text-neutral-400" /> {specKey}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Custom Key-Value Details Builder */}
-            <div className="pt-3 border-t border-neutral-100 space-y-3">
-              <label className={labelCls}>Custom Specifications (Key-Value Pairs)</label>
-              <div className="flex gap-2">
-                <input
-                  value={newKey}
-                  onChange={e => setNewKey(e.target.value)}
-                  placeholder="Feature (e.g. Pocket)"
-                  className={inputCls + ' flex-1'}
-                />
-                <input
-                  value={newValue}
-                  onChange={e => setNewValue(e.target.value)}
-                  placeholder="Detail (e.g. Double Front Pockets)"
-                  className={inputCls + ' flex-1'}
-                />
-                <button
-                  type="button"
-                  onClick={addCustomDetail}
-                  className="bg-neutral-900 hover:bg-black text-white px-4 rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0"
-                >
-                  <ListPlus className="w-3.5 h-3.5" /> Add
-                </button>
-              </div>
+            {/* Open Editable Specifications List */}
+            <div className="space-y-3 pt-2">
+              <label className={labelCls}>Open Specifications (Key & Value Pairs)</label>
 
-              {customDetails.length > 0 && (
-                <div className="grid sm:grid-cols-2 gap-2 pt-1">
+              {customDetails.length === 0 ? (
+                <div className="p-4 border border-dashed border-neutral-200 rounded-xl text-center space-y-2 bg-neutral-50/50">
+                  <p className="text-xs text-neutral-500 font-medium">No custom specifications added yet.</p>
+                  <p className="text-[11px] text-neutral-400">Click &ldquo;Auto-Fill with Gemini AI&rdquo; or add any key-value pair below.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
                   {customDetails.map((cd, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs">
-                      <div>
-                        <strong className="text-neutral-900">{cd.key}:</strong>{' '}
-                        <span className="text-neutral-600">{cd.value}</span>
-                      </div>
-                      <button type="button" onClick={() => removeCustomDetail(idx)} className="text-neutral-400 hover:text-red-600 p-1">
-                        <X className="w-3.5 h-3.5" />
+                    <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-neutral-50 border border-neutral-200/90 shadow-2xs">
+                      <input
+                        value={cd.key}
+                        onChange={e => {
+                          const val = e.target.value
+                          setCustomDetails(prev => {
+                            const updated = [...prev]
+                            updated[idx] = { ...updated[idx], key: val }
+                            return updated
+                          })
+                        }}
+                        placeholder="Feature Name (e.g. Material)"
+                        className="w-1/3 min-w-[120px] bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-neutral-900 focus:outline-none focus:border-black transition-colors"
+                      />
+                      <input
+                        value={cd.value}
+                        onChange={e => {
+                          const val = e.target.value
+                          setCustomDetails(prev => {
+                            const updated = [...prev]
+                            updated[idx] = { ...updated[idx], value: val }
+                            return updated
+                          })
+                        }}
+                        placeholder="Detail (e.g. 100% French Terry Cotton)"
+                        className="flex-1 bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-black transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCustomDetail(idx)}
+                        className="p-1.5 text-neutral-300 hover:text-red-600 rounded-lg hover:bg-neutral-100 transition-colors"
+                        title="Delete specification"
+                      >
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* Add New Specification Input Bar */}
+              <div className="flex gap-2 pt-2 border-t border-neutral-100">
+                <input
+                  value={newKey}
+                  onChange={e => setNewKey(e.target.value)}
+                  placeholder="New Spec Name (e.g. Fit)"
+                  className="w-1/3 min-w-[120px] bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-black transition-colors"
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomDetail())}
+                />
+                <input
+                  value={newValue}
+                  onChange={e => setNewValue(e.target.value)}
+                  placeholder="New Spec Detail (e.g. Oversized Drop Shoulder)"
+                  className="flex-1 bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-black transition-colors"
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomDetail())}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomDetail}
+                  className="bg-black hover:bg-neutral-800 text-white px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add
+                </button>
+              </div>
             </div>
           </div>
 
@@ -817,7 +885,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
                             type="number"
                             min="0"
                             value={currentQty}
-                            onChange={e => handleSizeStockChange(s, parseInt(e.target.value) || 0)}
+                            onChange={e => handleSizeStockChange(s, e.target.value)}
                             className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-1.5 text-neutral-900 text-sm font-semibold focus:outline-none focus:border-black transition-colors"
                           />
                         </div>

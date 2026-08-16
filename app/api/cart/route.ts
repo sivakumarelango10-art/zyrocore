@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAvailableStockForSize } from '@/lib/inventory-utils'
 
 export async function GET() {
   try {
@@ -74,23 +75,12 @@ export async function POST(req: NextRequest) {
     const targetQty = existingQty + qty
 
     // 5. Validate size-specific stock and overall stock
-    const sizeStockObj = (typeof product.size_stock === 'object' && product.size_stock !== null) ? product.size_stock : {}
-    if (sizeVal) {
-      const availableForSize = Math.max(0, Number(sizeStockObj[sizeVal]) || 0)
-      if (availableForSize === 0) {
-        return NextResponse.json({ error: `Size ${sizeVal} is currently out of stock.` }, { status: 400 })
-      }
-      if (targetQty > availableForSize) {
-        return NextResponse.json({ error: 'Only the available quantity can be added for this size.' }, { status: 400 })
-      }
-    } else {
-      const overallStock = Math.max(0, Number(product.stock) || 0)
-      if (overallStock === 0) {
-        return NextResponse.json({ error: 'This product is currently out of stock.' }, { status: 400 })
-      }
-      if (targetQty > overallStock) {
-        return NextResponse.json({ error: 'Only the available quantity can be added for this product.' }, { status: 400 })
-      }
+    const availableForSize = getAvailableStockForSize(product.stock, product.size_stock, sizeVal)
+    if (availableForSize === 0) {
+      return NextResponse.json({ error: sizeVal ? `Size ${sizeVal} is currently out of stock.` : 'This product is currently out of stock.' }, { status: 400 })
+    }
+    if (targetQty > availableForSize) {
+      return NextResponse.json({ error: `Only ${availableForSize} units available for ${sizeVal ? `size ${sizeVal}` : 'this product'}.` }, { status: 400 })
     }
 
     // 6. Upsert cart item

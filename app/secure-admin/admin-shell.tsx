@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Package, PackagePlus, ShoppingBag,
@@ -98,7 +99,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           >
             <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-black text-xs font-bold flex-shrink-0 overflow-hidden border border-neutral-700">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                <Image src={user.avatar_url} alt={user.name} width={28} height={28} unoptimized className="w-full h-full object-cover" />
               ) : (
                 user.name.charAt(0).toUpperCase()
               )}

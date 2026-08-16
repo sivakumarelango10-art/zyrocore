@@ -3,7 +3,6 @@ import Footer from '@/components/footer'
 import HeroSection from './home/hero-section'
 import BannerStrip from './home/banner-strip'
 import NewArrivalsSection from './home/new-arrivals-section'
-import BrandStorySection from './home/brand-story-section'
 import sql from '@/lib/db'
 import type { Product } from '@/lib/types'
 
@@ -75,7 +74,6 @@ export default async function HomePage() {
         <HeroSection />
         <BannerStrip />
         <NewArrivalsSection products={homeProducts} />
-        <BrandStorySection />
       </main>
       <Footer />
     </div>
