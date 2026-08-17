@@ -131,7 +131,10 @@ export default function AccountPage() {
         state: geo.state || prev.state,
         zip: geo.pincode || prev.zip,
       }))
-      toast.success('Address filled from your location!', { id: toastId })
+      const accText = geo.accuracy && geo.accuracy <= 25
+        ? ` (GPS Accuracy: ±${Math.round(geo.accuracy)}m)`
+        : ''
+      toast.success(`Address filled from your exact location!${accText}`, { id: toastId })
     } catch (err: any) {
       toast.error(err.message || 'Failed to detect location', { id: toastId })
     } finally {

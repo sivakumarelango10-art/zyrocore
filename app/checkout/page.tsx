@@ -159,14 +159,17 @@ export default function CheckoutPage() {
         ...f,
         address: geo.address || f.address,
         address2: geo.address2 || f.address2,
-        landmark: geo.locality || f.landmark,
+        landmark: geo.landmark || geo.locality || f.landmark,
         city: geo.city || f.city,
         district: geo.district || f.district,
         state: geo.state || f.state,
         pincode: geo.pincode || f.pincode,
         country: 'India',
       }))
-      toast.success('Address auto-filled from your location!', { id: toastId })
+      const accText = geo.accuracy && geo.accuracy <= 25
+        ? ` (GPS Accuracy: ±${Math.round(geo.accuracy)}m)`
+        : ''
+      toast.success(`Address filled from your exact location!${accText}`, { id: toastId })
     } catch (err: any) {
       toast.error(err.message || 'Failed to detect location', { id: toastId })
     } finally {

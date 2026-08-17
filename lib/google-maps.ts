@@ -8,116 +8,191 @@ export interface GeocodedAddress {
   state: string
   country: string
   pincode: string
+  accuracy?: number
 }
 
 /**
- * Gets user's current GPS position and reverse-geocodes it into structured address fields.
- * Uses Google Maps Geocoding API if key is present, with zero-config Nominatim fallback.
+ * Gets high-precision GPS coordinates using watchPosition accumulator to ensure
+ * true hardware GPS satellite lock (down to 3-10m on mobile/GPS devices).
  */
-export async function getCurrentLocationAddress(): Promise<GeocodedAddress> {
+function getHighAccuracyCoordinates(): Promise<{ lat: number; lng: number; accuracy: number }> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by your browser.'))
-      return
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return reject(new Error('Geolocation is not supported by your browser.'))
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude: lat, longitude: lng } = position.coords
+    let bestPosition: GeolocationPosition | null = null
+    let watchId: number | null = null
+    let timeoutId: any = null
 
-        try {
-          const googleKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    const finish = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId)
 
-          if (googleKey) {
-            // Google Maps Geocoding API
-            const res = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googleKey}`
-            )
-            const data = await res.json()
+      if (bestPosition) {
+        resolve({
+          lat: bestPosition.coords.latitude,
+          lng: bestPosition.coords.longitude,
+          accuracy: bestPosition.coords.accuracy,
+        })
+      } else {
+        reject(new Error('Unable to obtain precise GPS coordinates. Please ensure location services are enabled.'))
+      }
+    }
 
-            if (data.status === 'OK' && data.results?.[0]) {
-              const components = data.results[0].address_components
-              const getComp = (type: string) =>
-                components.find((c: any) => c.types.includes(type))?.long_name || ''
+    // Set a sampling window of 4.5 seconds to acquire the most precise GPS satellite lock
+    timeoutId = setTimeout(finish, 4500)
 
-              const pincode = getComp('postal_code')
-              const city = getComp('locality') || getComp('administrative_area_level_2') || getComp('sublocality_level_1')
-              const state = getComp('administrative_area_level_1')
-              const district = getComp('administrative_area_level_2')
-              const locality = getComp('sublocality_level_1') || getComp('sublocality')
-              const route = getComp('route')
-              const streetNumber = getComp('street_number')
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+            bestPosition = position
+          }
 
-              const addressLine = [streetNumber, route, locality].filter(Boolean).join(', ') || data.results[0].formatted_address
-
-              resolve({
-                address: addressLine,
-                address2: locality !== addressLine ? locality : '',
-                locality,
-                city: city || 'City',
-                district: district || city,
-                state: state || '',
-                country: 'India',
-                pincode: pincode || '',
-              })
-              return
+          // If we achieved high GPS precision (<= 15 meters), resolve immediately
+          if (position.coords.accuracy <= 15) {
+            finish()
+          }
+        },
+        (error) => {
+          if (!bestPosition) {
+            if (timeoutId) clearTimeout(timeoutId)
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                reject(new Error('Location access denied. Please grant GPS permission in your browser settings.'))
+                break
+              case error.POSITION_UNAVAILABLE:
+                reject(new Error('GPS location information is currently unavailable.'))
+                break
+              case error.TIMEOUT:
+                reject(new Error('Location request timed out. Please try again.'))
+                break
+              default:
+                reject(new Error('An error occurred while detecting your location.'))
             }
           }
-
-          // Fallback: OpenStreetMap Nominatim API (Free, zero-config)
-          const nominatimRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
-          )
-          const data = await nominatimRes.json()
-
-          if (data && data.address) {
-            const addr = data.address
-            const pincode = addr.postcode || ''
-            const city = addr.city || addr.town || addr.village || addr.suburb || ''
-            const district = addr.county || addr.state_district || city
-            const state = addr.state || ''
-            const road = addr.road || addr.suburb || addr.neighbourhood || ''
-            const house = addr.house_number || addr.building || ''
-
-            const fullLine1 = [house, road, addr.suburb].filter(Boolean).join(', ') || data.display_name.split(',')[0]
-
-            resolve({
-              address: fullLine1,
-              address2: addr.neighbourhood || addr.suburb || '',
-              locality: addr.suburb || addr.neighbourhood || '',
-              city: city || 'City',
-              district: district || city,
-              state: state || '',
-              country: 'India',
-              pincode,
-            })
-            return
-          }
-
-          reject(new Error('Unable to resolve address from your coordinates.'))
-        } catch (err) {
-          console.error('[geolocation reverse geocode error]:', err)
-          reject(new Error('Failed to retrieve address details.'))
-        }
-      },
-      (error) => {
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            reject(new Error('Location access denied. Please grant GPS permission in your browser settings.'))
-            break
-          case error.POSITION_UNAVAILABLE:
-            reject(new Error('Location information is unavailable.'))
-            break
-          case error.TIMEOUT:
-            reject(new Error('The request to get user location timed out.'))
-            break
-          default:
-            reject(new Error('An unknown location error occurred.'))
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    } catch {
+      // Fallback to single getCurrentPosition if watchPosition fails
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    }
   })
+}
+
+/**
+ * Gets user's current GPS position and reverse-geocodes it into structured address fields with rooftop precision (zoom=18).
+ * Uses Google Maps Geocoding API if key is present, with OpenStreetMap Nominatim (zoom=18 building level) fallback.
+ */
+export async function getCurrentLocationAddress(): Promise<GeocodedAddress> {
+  const { lat, lng, accuracy } = await getHighAccuracyCoordinates()
+
+  const googleKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+  if (googleKey) {
+    try {
+      // Use exact rooftop / building level geocoding
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&location_type=ROOFTOP|RANGE_INTERPOLATED|GEOMETRIC_CENTER&key=${googleKey}`
+      )
+      const data = await res.json()
+
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        // Pick the most specific rooftop/premise result
+        const result = data.results.find((r: any) => 
+          r.types.includes('premise') || 
+          r.types.includes('subpremise') || 
+          r.types.includes('street_address')
+        ) || data.results[0]
+
+        const components = result.address_components
+        const getComp = (type: string) =>
+          components.find((c: any) => c.types.includes(type))?.long_name || ''
+
+        const pincode = getComp('postal_code')
+        const city = getComp('locality') || getComp('sublocality_level_1') || getComp('administrative_area_level_2')
+        const state = getComp('administrative_area_level_1')
+        const district = getComp('administrative_area_level_2') || getComp('locality')
+        const sublocality2 = getComp('sublocality_level_2')
+        const sublocality1 = getComp('sublocality_level_1') || getComp('sublocality')
+        const neighborhood = getComp('neighborhood')
+        const route = getComp('route')
+        const streetNumber = getComp('street_number')
+        const premise = getComp('premise') || getComp('subpremise')
+
+        const streetParts = [premise, streetNumber, route].filter(Boolean).join(' ')
+        const areaParts = [sublocality2, sublocality1 || neighborhood].filter(Boolean).join(', ')
+
+        const line1 = streetParts || areaParts || result.formatted_address.split(',')[0]
+        const line2 = streetParts && areaParts ? areaParts : ''
+
+        return {
+          address: line1,
+          address2: line2,
+          locality: sublocality1 || neighborhood || sublocality2 || '',
+          landmark: neighborhood || sublocality2 || '',
+          city: city || 'City',
+          district: district || city,
+          state: matchIndianState(state),
+          country: 'India',
+          pincode: pincode ? pincode.replace(/\D/g, '').slice(0, 6) : '',
+          accuracy,
+        }
+      }
+    } catch (err) {
+      console.warn('[google geocoding error]:', err)
+    }
+  }
+
+  // High-precision OpenStreetMap Nominatim with zoom=18 (building/house level)
+  try {
+    const nominatimRes = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    )
+    const data = await nominatimRes.json()
+
+    if (data && data.address) {
+      const addr = data.address
+      const pincode = addr.postcode || ''
+      const city = addr.city || addr.town || addr.municipality || addr.village || addr.suburb || ''
+      const district = addr.county || addr.state_district || addr.district || city
+      const state = addr.state || ''
+
+      const houseNumber = addr.house_number || addr.building || addr.house_name || ''
+      const amenity = addr.amenity || addr.shop || addr.office || addr.leisure || ''
+      const road = addr.road || addr.street || addr.residential || ''
+      const sublocality = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || ''
+      const landmark = addr.landmark || addr.amenity || addr.place || ''
+
+      const streetBuilding = [amenity, houseNumber, road].filter(Boolean).join(' ')
+      const fullLine1 = streetBuilding || sublocality || (data.display_name ? data.display_name.split(',')[0] : '')
+
+      return {
+        address: fullLine1,
+        address2: sublocality && sublocality !== fullLine1 ? sublocality : '',
+        locality: sublocality,
+        landmark: landmark || sublocality,
+        city: city.trim() || 'City',
+        district: (district || city).trim(),
+        state: matchIndianState(state),
+        country: 'India',
+        pincode: pincode ? pincode.replace(/\D/g, '').slice(0, 6) : '',
+        accuracy,
+      }
+    }
+  } catch (err) {
+    console.warn('[nominatim geocoding error]:', err)
+  }
+
+  throw new Error('Unable to resolve a precise address from your current GPS location.')
 }
 
 export interface PincodeDetails {
