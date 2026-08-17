@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
   Package, Heart, ShoppingCart, User, LogOut, Edit3, MapPin, Phone,
-  Mail, Key, Save, X, Shield, ChevronRight, Loader2
+  Mail, Key, Save, X, Shield, ChevronRight, Loader2, Trash2, AlertTriangle
 } from 'lucide-react'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
@@ -40,6 +40,32 @@ export default function AccountPage() {
     newPassword: '',
     confirmPassword: '',
   })
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      })
+      const data = await safeParseJson(res)
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete account')
+
+      toast.success('Your account has been deleted permanently.')
+      await logout()
+      router.push('/')
+    } catch (err: any) {
+      toast.error(err.message || 'Could not delete account')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Sync state when user is loaded or updated
   useEffect(() => {
@@ -504,9 +530,96 @@ export default function AccountPage() {
               </div>
             )}
           </div>
+
+          {/* Danger Zone / Delete Account Card */}
+          <div className="bg-destructive/5 border border-destructive/20 rounded-2xl p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-base text-destructive flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" /> Danger Zone: Delete Account
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Permanently delete your user profile, saved items, and active sessions. This action cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  setDeletePassword('')
+                  setShowDeleteModal(true)
+                }}
+                className="font-bold text-xs shrink-0 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Account
+              </Button>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="font-bold text-lg text-destructive flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Confirm Account Deletion
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setShowDeleteModal(false)}>
+                <X className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to delete your account? All your personal details, wishlist items, cart contents, and active login sessions will be permanently removed.
+            </p>
+
+            <form onSubmit={handleDeleteAccount} className="space-y-4 pt-2">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Confirm Password
+                </label>
+                <Input
+                  type="password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  placeholder="Enter your password to confirm"
+                  autoComplete="current-password"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  (Leave blank if you registered via Google OAuth)
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  size="sm"
+                  disabled={deleting}
+                  className="font-bold flex items-center gap-1.5"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deleting ? 'Deleting Account...' : 'Permanently Delete'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

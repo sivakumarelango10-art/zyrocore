@@ -214,11 +214,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Revalidate paths for ISR
+    // Revalidate paths for ISR and frontend cache
     revalidatePath('/')
     revalidatePath('/products')
     revalidatePath('/shop')
     revalidatePath(`/products/${productId}`)
+    revalidatePath('/secure-admin/products')
+    revalidatePath('/secure-admin/inventory')
 
     return NextResponse.json({ success: true })
   } catch (error) {

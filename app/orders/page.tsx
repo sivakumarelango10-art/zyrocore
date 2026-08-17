@@ -1,7 +1,9 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
@@ -10,37 +12,43 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice, formatDate, getOrderStatusColor } from '@/lib/utils-shop'
 import { useAuth } from '@/components/auth-provider'
-import { Package } from 'lucide-react'
+import { Package, CheckCircle2 } from 'lucide-react'
 import type { Order } from '@/lib/types'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-export default function OrdersPage() {
+function OrdersContent() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const isSuccess = searchParams.get('success') === '1'
   const { data, isLoading } = useSWR(user ? '/api/orders' : null, fetcher)
   const orders: Order[] = data?.orders ?? []
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-xl font-semibold mb-2">Sign in to view orders</h1>
-            <Button asChild className="mt-3"><Link href="/login">Sign In</Link></Button>
-          </div>
-        </main>
-        <Footer />
-      </div>
+      <main className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold mb-2">Sign in to view orders</h1>
+          <Button asChild className="mt-3"><Link href="/login">Sign In</Link></Button>
+        </div>
+      </main>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold mb-8">My Orders</h1>
+    <main className="flex-1">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {isSuccess && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+            <div>
+              <p className="font-bold text-sm">Order Placed Successfully!</p>
+              <p className="text-xs text-muted-foreground">Your Razorpay payment was confirmed. We are preparing your order.</p>
+            </div>
+          </div>
+        )}
+
+        <h1 className="text-2xl font-bold mb-8">My Orders</h1>
 
           {isLoading ? (
             <div className="space-y-4">
@@ -107,7 +115,24 @@ export default function OrdersPage() {
           )}
         </div>
       </main>
+    )
+}
+
+export default function OrdersPage() {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <Suspense fallback={
+        <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+          </div>
+        </main>
+      }>
+        <OrdersContent />
+      </Suspense>
       <Footer />
     </div>
   )
 }
+

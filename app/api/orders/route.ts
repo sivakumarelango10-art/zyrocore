@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAvailableStockForSize } from '@/lib/inventory-utils'
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,11 +31,12 @@ export async function GET(req: NextRequest) {
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
         WHERE o.user_id = ${user.id}
+          AND (o.payment_status = 'paid' OR o.status IN ('confirmed', 'shipped', 'delivered'))
         GROUP BY o.id
         ORDER BY o.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `,
-      sql`SELECT COUNT(*)::int AS count FROM orders WHERE user_id = ${user.id}`,
+      sql`SELECT COUNT(*)::int AS count FROM orders WHERE user_id = ${user.id} AND (payment_status = 'paid' OR status IN ('confirmed', 'shipped', 'delivered'))`,
     ])
 
     const total = parseInt(countRes[0]?.count || '0')
@@ -149,28 +151,13 @@ export async function POST(req: NextRequest) {
           )
         }
 
-        // Check overall stock
-        if (product.stock < qty) {
+        // Check stock for item / size using canonical inventory utility
+        const availStock = getAvailableStockForSize(product.stock, product.size_stock, item.size)
+        if (availStock < qty) {
           return NextResponse.json(
-            { error: `Insufficient available stock for "${product.name}".` },
+            { error: `Insufficient available stock for "${product.name}"${item.size ? ` (Size ${item.size})` : ''}. Available: ${availStock}, Requested: ${qty}` },
             { status: 400 }
           )
-        }
-
-        // Check size stock if size specified
-        if (item.size) {
-          const parsedSizeStock: Record<string, number> =
-            product.size_stock && typeof product.size_stock === 'object'
-              ? (product.size_stock as Record<string, number>)
-              : {}
-
-          const availForSize = Math.max(0, Number(parsedSizeStock[item.size]) || 0)
-          if (availForSize < qty) {
-            return NextResponse.json(
-              { error: `Only the available quantity can be added for size ${item.size} of "${product.name}".` },
-              { status: 400 }
-            )
-          }
         }
 
         // Canonical price from DB

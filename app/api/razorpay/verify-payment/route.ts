@@ -4,6 +4,7 @@ import sql from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { revalidatePath } from 'next/cache'
+import { getAvailableStockForSize } from '@/lib/inventory-utils'
 
 export async function POST(req: NextRequest) {
   try {
@@ -83,88 +84,71 @@ export async function POST(req: NextRequest) {
           }
 
           const product = lockedProduct[0]
-          const reqQty = Number(item.quantity) || 1
+          const reqQty = Math.max(1, Number(item.quantity) || 1)
+          const availStock = getAvailableStockForSize(product.stock, product.size_stock, item.size)
 
-          if (Number(product.stock) < reqQty) {
-            throw new Error(`INSUFFICIENT_STOCK:${product.name} (Available: ${product.stock}, Requested: ${reqQty})`)
-          }
-
-          if (item.size) {
-            const normSize = String(item.size).trim().toUpperCase()
-            let sizeStockMap: Record<string, number> = {}
-            if (typeof product.size_stock === 'object' && product.size_stock !== null) {
-              sizeStockMap = product.size_stock as Record<string, number>
-            } else if (typeof product.size_stock === 'string') {
-              try {
-                sizeStockMap = JSON.parse(product.size_stock)
-              } catch { }
-            }
-
-            const matchedKey = Object.keys(sizeStockMap).find(k => k.trim().toUpperCase() === normSize) || normSize
-            const availForSize = Math.max(0, Number(sizeStockMap[matchedKey]) || 0)
-            if (availForSize < reqQty) {
-              throw new Error(`INSUFFICIENT_SIZE_STOCK:${product.name} Size ${normSize} (Available: ${availForSize}, Requested: ${reqQty})`)
-            }
+          if (availStock < reqQty) {
+            throw new Error(`INSUFFICIENT_STOCK:${product.name} (Available: ${availStock}, Requested: ${reqQty})`)
           }
         }
 
-        // Step B: Atomically deduct stock for validated items using row-level compare-and-swap
+        // Step B: Atomically deduct stock for validated items
         for (const item of orderItems) {
           if (!item.product_id) continue
-          const reqQty = Number(item.quantity) || 1
+          const reqQty = Math.max(1, Number(item.quantity) || 1)
 
-          if (item.size) {
-            const normSize = String(item.size).trim().toUpperCase()
-            // Deduct size-specific stock and recalculate total stock from sum of all sizes
-            const updated = await txSql`
-              UPDATE products
-              SET size_stock = jsonb_set(
-                    COALESCE(size_stock, '{}'::jsonb),
-                    ARRAY[${normSize}]::text[],
-                    to_jsonb(GREATEST(0, COALESCE((size_stock->>${normSize})::int, COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0)) - ${reqQty}))
-                  ),
-                  -- Recalculate total stock as sum of all size_stock values after deduction
-                  stock = GREATEST(0, (
-                    SELECT COALESCE(SUM(val::int), 0)
-                    FROM jsonb_each_text(
-                      jsonb_set(
-                        COALESCE(size_stock, '{}'::jsonb),
-                        ARRAY[${normSize}]::text[],
-                        to_jsonb(GREATEST(0, COALESCE((size_stock->>${normSize})::int, COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0)) - ${reqQty}))
-                      )
-                    ) AS t(key, val)
-                  )),
-                  updated_at = NOW()
-              WHERE id = ${item.product_id}
-                AND (
-                  COALESCE((size_stock->>${normSize})::int, 0) >= ${reqQty}
-                  OR COALESCE((size_stock->>${normSize.toLowerCase()})::int, 0) >= ${reqQty}
-                )
-              RETURNING id
-            `
+          const [currentProd] = await txSql`
+            SELECT id, name, stock, size_stock FROM products WHERE id = ${item.product_id}
+          `
+          if (!currentProd) continue
 
-            if (updated.length === 0) {
-              throw new Error(`INSUFFICIENT_STOCK:Stock changed during checkout for product #${item.product_id}`)
-            }
-          } else {
-            const updated = await txSql`
-              UPDATE products
-              SET stock = stock - ${reqQty},
-                  updated_at = NOW()
-              WHERE id = ${item.product_id} AND stock >= ${reqQty}
-              RETURNING id
-            `
+          let currentStock = Math.max(0, Number(currentProd.stock) || 0)
+          let sizeStockMap: Record<string, number> = {}
 
-            if (updated.length === 0) {
-              throw new Error(`INSUFFICIENT_STOCK:Stock changed during checkout for product #${item.product_id}`)
+          if (typeof currentProd.size_stock === 'object' && currentProd.size_stock !== null) {
+            sizeStockMap = { ...currentProd.size_stock }
+          } else if (typeof currentProd.size_stock === 'string') {
+            try {
+              sizeStockMap = JSON.parse(currentProd.size_stock)
+            } catch {
+              sizeStockMap = {}
             }
           }
+
+          const keys = Object.keys(sizeStockMap)
+          if (item.size && keys.length > 0) {
+            const normTarget = String(item.size).trim().toUpperCase()
+            const matchedKey = keys.find(k => String(k).trim().toUpperCase() === normTarget)
+
+            if (matchedKey) {
+              const currentSizeQty = Math.max(0, Number(sizeStockMap[matchedKey]) || 0)
+              sizeStockMap[matchedKey] = Math.max(0, currentSizeQty - reqQty)
+              // Recalculate total stock as sum of size_stock values if size_stock is fully configured
+              const sumSizeStock = Object.values(sizeStockMap).reduce((acc, val) => acc + Math.max(0, Number(val) || 0), 0)
+              currentStock = sumSizeStock
+            } else {
+              currentStock = Math.max(0, currentStock - reqQty)
+            }
+          } else {
+            currentStock = Math.max(0, currentStock - reqQty)
+          }
+
+          await txSql`
+            UPDATE products
+            SET stock = ${currentStock},
+                size_stock = ${JSON.stringify(sizeStockMap)}::jsonb,
+                updated_at = NOW()
+            WHERE id = ${item.product_id}
+          `
 
           try {
             revalidatePath('/')
             revalidatePath('/products')
             revalidatePath('/shop')
             revalidatePath(`/products/${item.product_id}`)
+            revalidatePath('/orders')
+            revalidatePath('/secure-admin/orders')
+            revalidatePath('/secure-admin/inventory')
           } catch (revalErr) {
             console.warn('[verify-payment] Revalidation warning:', revalErr)
           }

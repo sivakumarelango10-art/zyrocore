@@ -62,8 +62,15 @@ export default function AdminProductsPage() {
     const res = await fetch(`/api/admin/products/${id}`, {
       method: 'DELETE',
     })
-    if (res.ok) { toast.success('Product deleted'); load() }
-    else toast.error('Failed to delete product')
+    if (res.ok) {
+      toast.success('Product deleted')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('zyrocore-realtime-update'))
+      }
+      load()
+    } else {
+      toast.error('Failed to delete product')
+    }
     setDeletingId(null)
   }
 

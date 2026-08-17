@@ -305,8 +305,8 @@ export default function CheckoutPage() {
             })
             const verifyJson = await verifyRes.json()
             if (verifyRes.ok && verifyJson.success) {
-              toast.success('Payment verified successfully!', { id: verifyToast })
-              router.push(`/orders/${createdOrderId}?success=1`)
+              toast.success('Order placed successfully!', { id: verifyToast })
+              router.push('/orders?success=1')
             } else {
               toast.error(verifyJson.error || 'Payment verification failed', { id: verifyToast })
               setPlacing(false)
@@ -317,16 +317,22 @@ export default function CheckoutPage() {
           }
         },
         modal: {
-          ondismiss: function () {
+          ondismiss: async function () {
             toast.error('Your payment was not completed, so your order was not placed.')
+            try {
+              await fetch(`/api/orders/${createdOrderId}`, { method: 'DELETE' })
+            } catch { }
             setPlacing(false)
           },
         },
       }
 
       const razorpayInstance = new (window as any).Razorpay(options)
-      razorpayInstance.on('payment.failed', function () {
+      razorpayInstance.on('payment.failed', async function () {
         toast.error('Your payment was not completed, so your order was not placed.')
+        try {
+          await fetch(`/api/orders/${createdOrderId}`, { method: 'DELETE' })
+        } catch { }
         setPlacing(false)
       })
       razorpayInstance.open()

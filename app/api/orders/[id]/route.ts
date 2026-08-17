@@ -65,3 +65,28 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await getSession()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await params
+    const orderIdNum = parseInt(id)
+    if (isNaN(orderIdNum)) {
+      return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 })
+    }
+
+    // Safely cleanup draft order if unpaid
+    await sql`
+      DELETE FROM orders 
+      WHERE id = ${orderIdNum} AND user_id = ${user.id} AND payment_status = 'pending'
+    `
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[orders/[id] DELETE] error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+

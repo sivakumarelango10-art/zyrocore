@@ -6,7 +6,8 @@ import NewArrivalsSection from './home/new-arrivals-section'
 import sql from '@/lib/db'
 import type { Product } from '@/lib/types'
 
-export const revalidate = 3600 // 1 hour ISR for fast edge response time (<500ms)
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 async function getHomeProducts(): Promise<Product[]> {
   try {
