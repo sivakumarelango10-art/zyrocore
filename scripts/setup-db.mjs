@@ -256,6 +256,7 @@ try {
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`
   await sql`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_sessions_id_expires ON sessions(id, expires_at)`
   await sql`CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)`

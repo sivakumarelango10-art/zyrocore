@@ -6,13 +6,16 @@ const globalForDb = globalThis as unknown as {
 
 const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || ''
 
+// Optimize connection settings for low latency (< 200ms target)
+const isTransactionPooler = dbUrl.includes('6543') || dbUrl.includes('pooler')
+
 const sql = globalForDb.sql ?? postgres(dbUrl, {
   ssl: 'require',
-  max: 10,
-  connect_timeout: 5,
-  idle_timeout: 30,
-  max_lifetime: 60 * 15,
-  prepare: false,
+  max: 15,
+  connect_timeout: 10,
+  idle_timeout: 20,
+  max_lifetime: 60 * 10,
+  prepare: !isTransactionPooler,
   types: {
     numeric: {
       to: 1700,

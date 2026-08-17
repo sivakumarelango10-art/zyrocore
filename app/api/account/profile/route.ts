@@ -135,3 +135,80 @@ export async function PUT(req: Request) {
   }
 }
 
+export async function DELETE(req: Request) {
+  const sessionUser = await getSession()
+  if (!sessionUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    let body: any = {}
+    try {
+      const text = await req.text()
+      if (text && text.trim()) {
+        body = JSON.parse(text)
+      }
+    } catch {
+      // Payload optional
+    }
+
+    const { password } = body || {}
+
+    // Check user account details
+    const userRows = await sql`
+      SELECT id, password_hash FROM users WHERE id = ${sessionUser.id} LIMIT 1
+    `
+
+    if (userRows.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const userHash = userRows[0].password_hash
+
+    // Require password check for standard email/password accounts
+    if (userHash && userHash !== 'OAUTH_USER_NO_PASSWORD') {
+      if (!password || typeof password !== 'string' || !password.trim()) {
+        return NextResponse.json(
+          { error: 'Password confirmation is required to delete your account' },
+          { status: 400 }
+        )
+      }
+
+      const isValidPassword = await bcrypt.compare(password, userHash)
+      if (!isValidPassword) {
+        return NextResponse.json(
+          { error: 'Incorrect password. Account deletion aborted.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Delete user from database (ON DELETE CASCADE cleans up sessions, cart, wishlists, reviews)
+    await sql`DELETE FROM users WHERE id = ${sessionUser.id}`
+
+    const response = NextResponse.json({
+      message: 'Account deleted successfully',
+    })
+
+    // Clear session cookies
+    response.cookies.set('session_id', '', {
+      httpOnly: true,
+      expires: new Date(0),
+      path: '/',
+    })
+    response.cookies.set('adminToken', '', {
+      httpOnly: true,
+      expires: new Date(0),
+      path: '/',
+    })
+
+    return response
+  } catch (error: any) {
+    console.error('Error deleting user account:', error)
+    return NextResponse.json(
+      { error: error?.message || 'Failed to delete account' },
+      { status: 500 }
+    )
+  }
+}
+
