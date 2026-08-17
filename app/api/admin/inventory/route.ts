@@ -19,47 +19,49 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50') || 50))
     const offset = (page - 1) * limit
 
-    const products = search
-      ? await sql`
-          SELECT
-            p.id,
-            p.name,
-            p.images,
-            p.sizes,
-            p.size_stock,
-            p.stock,
-            c.name as category_name
-          FROM products p
-          LEFT JOIN categories c ON p.category_id = c.id
-          WHERE p.name ILIKE ${'%' + search + '%'}
-             OR c.name ILIKE ${'%' + search + '%'}
-          ORDER BY p.name ASC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      : await sql`
-          SELECT
-            p.id,
-            p.name,
-            p.images,
-            p.sizes,
-            p.size_stock,
-            p.stock,
-            c.name as category_name
-          FROM products p
-          LEFT JOIN categories c ON p.category_id = c.id
-          ORDER BY p.name ASC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-
-    const countResult = search
-      ? await sql`
-          SELECT COUNT(*)::int AS total
-          FROM products p
-          LEFT JOIN categories c ON p.category_id = c.id
-          WHERE p.name ILIKE ${'%' + search + '%'}
-             OR c.name ILIKE ${'%' + search + '%'}
-        `
-      : await sql`SELECT COUNT(*)::int AS total FROM products`
+    const [products, countResult] = search
+      ? await Promise.all([
+          sql`
+            SELECT
+              p.id,
+              p.name,
+              p.images,
+              p.sizes,
+              p.size_stock,
+              p.stock,
+              c.name as category_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.name ILIKE ${'%' + search + '%'}
+               OR c.name ILIKE ${'%' + search + '%'}
+            ORDER BY p.name ASC
+            LIMIT ${limit} OFFSET ${offset}
+          `,
+          sql`
+            SELECT COUNT(*)::int AS total
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.name ILIKE ${'%' + search + '%'}
+               OR c.name ILIKE ${'%' + search + '%'}
+          `,
+        ])
+      : await Promise.all([
+          sql`
+            SELECT
+              p.id,
+              p.name,
+              p.images,
+              p.sizes,
+              p.size_stock,
+              p.stock,
+              c.name as category_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            ORDER BY p.name ASC
+            LIMIT ${limit} OFFSET ${offset}
+          `,
+          sql`SELECT COUNT(*)::int AS total FROM products`,
+        ])
 
     const total = Number(countResult[0]?.total || 0)
 

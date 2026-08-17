@@ -96,11 +96,7 @@ export default function InventoryPage() {
 
     window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
 
-    if (pollingRef.current) clearInterval(pollingRef.current)
-    pollingRef.current = setInterval(() => { load(true) }, 5000)
-
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
       window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
     }
   }, [load])

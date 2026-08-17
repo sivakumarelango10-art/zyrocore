@@ -136,12 +136,7 @@ export default function AdminOrdersPage() {
     window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    const interval = setInterval(() => {
-      if (!document.hidden) load(statusFilterRef.current, true)
-    }, 5000)
-
     return () => {
-      clearInterval(interval)
       window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }

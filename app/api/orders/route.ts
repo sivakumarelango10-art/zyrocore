@@ -196,14 +196,14 @@ export async function POST(req: NextRequest) {
       `
       const newOrderId = orders[0].id
 
-      for (const item of items as Array<{
+      const orderItemRows = (items as Array<{
         product_id?: number
         product_name: string
         product_image?: string
         price: number
         quantity: number
         size?: string
-      }>) {
+      }>).map(item => {
         const qty = Math.floor(Number(item.quantity) || 1)
         let storedPrice = Number(item.price || 0)
 
@@ -214,10 +214,20 @@ export async function POST(req: NextRequest) {
             : parseFloat(product.price)
         }
 
+        return {
+          order_id: newOrderId,
+          product_id: item.product_id || null,
+          product_name: item.product_name,
+          product_image: item.product_image || null,
+          price: storedPrice,
+          quantity: qty,
+          size: item.size || null,
+        }
+      })
+
+      if (orderItemRows.length > 0) {
         await txSql`
-          INSERT INTO order_items (order_id, product_id, product_name, product_image, price, quantity, size)
-          VALUES (${newOrderId}, ${item.product_id || null}, ${item.product_name}, ${item.product_image || null},
-            ${storedPrice}, ${qty}, ${item.size || null})
+          INSERT INTO order_items ${txSql(orderItemRows, 'order_id', 'product_id', 'product_name', 'product_image', 'price', 'quantity', 'size')}
         `
       }
 

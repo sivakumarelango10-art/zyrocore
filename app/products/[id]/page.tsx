@@ -36,7 +36,11 @@ const getProduct = cache(async (id: string): Promise<Product | null> => {
 const getRelated = cache(async (product: Product): Promise<Product[]> => {
   try {
     const rows = await sql`
-      SELECT p.*, c.name as category_name, c.slug as category_slug
+      SELECT 
+        p.id, p.name, p.price, p.discount_price, p.category_id, 
+        p.images, p.stock, p.sizes, p.rating, p.rating_count, 
+        p.is_featured, p.is_best_seller,
+        c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.category_id = ${product.category_id} AND p.id != ${product.id}

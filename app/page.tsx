@@ -6,8 +6,7 @@ import NewArrivalsSection from './home/new-arrivals-section'
 import sql from '@/lib/db'
 import type { Product } from '@/lib/types'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const revalidate = 60 // ISR revalidation every 60 seconds (and on-demand via revalidatePath)
 
 async function getHomeProducts(): Promise<Product[]> {
   try {

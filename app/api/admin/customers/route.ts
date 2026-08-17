@@ -15,27 +15,34 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20))
     const offset = (page - 1) * limit
 
-    const customers = await sql`
-      SELECT 
-        u.id,
-        u.name,
-        u.email,
-        u.role,
-        COALESCE(u.status, 'active') as status,
-        COALESCE(u.login_count, 0) as login_count,
-        u.last_login_at,
-        u.created_at,
-        COUNT(DISTINCT o.id) as total_orders,
-        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) as total_spent
-      FROM users u
-      LEFT JOIN orders o ON u.id = o.user_id
-      WHERE u.role = 'user'
-      GROUP BY u.id
-      ORDER BY u.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
+    const [customers, countRes] = await Promise.all([
+      sql`
+        WITH paginated_users AS (
+          SELECT id, name, email, role, status, login_count, last_login_at, created_at
+          FROM users
+          WHERE role = 'user'
+          ORDER BY created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        )
+        SELECT 
+          u.id,
+          u.name,
+          u.email,
+          u.role,
+          COALESCE(u.status, 'active') as status,
+          COALESCE(u.login_count, 0) as login_count,
+          u.last_login_at,
+          u.created_at,
+          COUNT(DISTINCT o.id) as total_orders,
+          COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) as total_spent
+        FROM paginated_users u
+        LEFT JOIN orders o ON u.id = o.user_id
+        GROUP BY u.id, u.name, u.email, u.role, u.status, u.login_count, u.last_login_at, u.created_at
+        ORDER BY u.created_at DESC
+      `,
+      sql`SELECT COUNT(*)::int AS count FROM users WHERE role = 'user'`,
+    ])
 
-    const countRes = await sql`SELECT COUNT(*) FROM users WHERE role = 'user'`
     const total = parseInt(countRes[0]?.count || '0')
 
     return NextResponse.json({

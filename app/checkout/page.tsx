@@ -88,6 +88,11 @@ export default function CheckoutPage() {
 
   const [loadingPincode, setLoadingPincode] = useState(false)
 
+  // Preload Razorpay Checkout SDK script on mount for instant payment modal activation
+  useEffect(() => {
+    void loadRazorpayScript()
+  }, [])
+
   // Auto-fill form from saved profile details when user is loaded
   useEffect(() => {
     if (user) {

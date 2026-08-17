@@ -335,11 +335,9 @@ export default function ProductForm({ productId }: ProductFormProps) {
     }
 
     window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
-    const interval = setInterval(loadProductData, 4000)
 
     return () => {
       window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
-      clearInterval(interval)
     }
   }, [productId])
 

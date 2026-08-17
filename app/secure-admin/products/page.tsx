@@ -41,11 +41,9 @@ export default function AdminProductsPage() {
       load()
     }
     window.addEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
-    const interval = setInterval(load, 5000)
 
     return () => {
       window.removeEventListener('zyrocore-realtime-update', handleRealtimeUpdate)
-      clearInterval(interval)
     }
   }, [])
 

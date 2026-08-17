@@ -7,12 +7,12 @@ type SortOption = typeof VALID_SORTS[number]
 const PRODUCT_COLUMNS = sql`
   p.id,
   p.name,
-  p.description,
   p.price,
   p.discount_price,
   p.category_id,
   p.images,
   p.stock,
+  p.sizes,
   p.rating,
   p.rating_count,
   p.is_featured,
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       },
       {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
         },
       }
     )

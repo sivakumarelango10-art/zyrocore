@@ -48,15 +48,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe()
 
-    // Light 5-second polling heartbeat fallback for instant cross-tab / dev sync
-    const heartbeat = setInterval(() => {
-      if (typeof document !== 'undefined' && !document.hidden) {
-        mutate((key) => typeof key === 'string' && key.startsWith('/api/cart'))
-      }
-    }, 5000)
-
     return () => {
-      clearInterval(heartbeat)
       supabase.removeChannel(channel)
     }
   }, [mutate])
